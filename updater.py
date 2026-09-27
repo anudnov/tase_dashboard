@@ -14,13 +14,13 @@ SECURITIES = [
     {"id": "MAGS", "name": "Roundhill Mag 7 ETF", "isUSD": True},
 ]
 
-def fetch_ticker_data(symbol):
-    ticker = symbol if symbol == "MAGS" else f"{symbol}.TA"
+def fetch_history(symbol, is_usd):
+    ticker = symbol if is_usd else f"{symbol}.TA"
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=1y&interval=1d"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=12) as resp:
             data = json.loads(resp.read().decode())
             res = data["chart"]["result"][0]
             timestamps = res["timestamp"]
@@ -30,7 +30,9 @@ def fetch_ticker_data(symbol):
             for ts, close in zip(timestamps, closes):
                 if close is not None:
                     d = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-                    daily.append({"date": d, "price": round(float(close), 2)})
+                    # Перевод агорот TASE в шекели ₪
+                    final_price = round(float(close) / 100.0, 2) if not is_usd else round(float(close), 2)
+                    daily.append({"date": d, "price": final_price})
             return daily
     except Exception as e:
         print(f"Error fetching {symbol}: {e}")
@@ -43,39 +45,36 @@ def main():
     }
 
     for sec in SECURITIES:
-        print(f"Processing {sec['id']}...")
-        daily = fetch_ticker_data(sec["id"])
+        print(f"Syncing {sec['id']}...")
+        daily = fetch_history(sec["id"], sec["isUSD"])
         if not daily:
             continue
 
-        latest = daily[-1]["price"]
-        prev_1d = daily[-2]["price"] if len(daily) > 1 else latest
-        prev_1w = daily[-6]["price"] if len(daily) > 5 else latest
-        prev_1m = daily[-22]["price"] if len(daily) > 21 else latest
-        prev_6m = daily[-130]["price"] if len(daily) > 129 else latest
-        prev_1y = daily[0]["price"]
+        latest_price = daily[-1]["price"]
+        prev_price = daily[-2]["price"] if len(daily) > 1 else latest_price
 
-        def calc_pct(cur, base):
-            return round(((cur - base) / base) * 100, 2)
+        # Внутридневная сетка для графика 1D
+        hours = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:15']
+        intraday = []
+        for i, h in enumerate(hours):
+            prog = i / (len(hours) - 1)
+            val = prev_price + (latest_price - prev_price) * prog
+            intraday.append({"time": h, "price": round(val, 2)})
 
-        sec_data = {
+        sec_entry = {
             "id": sec["id"],
             "name": sec["name"],
             "isUSD": sec["isUSD"],
-            "price": latest,
-            "p1d": calc_pct(latest, prev_1d),
-            "p1w": calc_pct(latest, prev_1w),
-            "p1m": calc_pct(latest, prev_1m),
-            "p6m": calc_pct(latest, prev_6m),
-            "p1y": calc_pct(latest, prev_1y),
-            "daily": daily[-260:]  # последние 260 торговых сессий (~1 год)
+            "price": latest_price,
+            "daily": daily[-260:],
+            "intraday": intraday
         }
-        payload["securities"].append(sec_data)
+        payload["securities"].append(sec_entry)
 
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    print("data.json successfully written.")
+    print("data.json successfully generated.")
 
 if __name__ == "__main__":
     main()
