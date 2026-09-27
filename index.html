@@ -64,11 +64,12 @@
 
     .controls {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
-    select, button {
+    select, button, input {
       background: #21262d;
       color: var(--text-bright);
       border: 1px solid var(--border);
@@ -79,8 +80,35 @@
       outline: none;
     }
 
+    input {
+      cursor: text;
+    }
+
     button:hover, select:hover {
       border-color: var(--accent);
+    }
+
+    button.btn-primary {
+      background: #238636;
+      border-color: rgba(240, 246, 252, 0.1);
+      color: #fff;
+    }
+
+    button.btn-primary:hover {
+      background: #2ea043;
+      border-color: #2ea043;
+    }
+
+    button.btn-danger {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 4px 8px;
+      font-size: 16px;
+    }
+
+    button.btn-danger:hover {
+      color: var(--red);
     }
 
     .table-wrapper {
@@ -217,6 +245,60 @@
       color: var(--text-muted);
       margin-bottom: 12px;
     }
+
+    /* Modal dialog */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .modal h2 {
+      font-size: 18px;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
@@ -230,6 +312,8 @@
       </div>
       <div class="controls">
         <select id="fundSelect" onchange="onSelectChange()"></select>
+        <button class="btn-primary" onclick="openAddModal()">+ Add Security</button>
+        <button onclick="resetDefaults()">Reset to Default</button>
         <button onclick="loadDataFromJSON()">Refresh Data</button>
       </div>
     </header>
@@ -251,6 +335,7 @@
             <th>1 Month</th>
             <th>6 Months</th>
             <th>1 Year</th>
+            <th style="text-align: center; width: 40px;">Act</th>
           </tr>
         </thead>
         <tbody id="comparisonTableBody"></tbody>
@@ -323,18 +408,60 @@
   </div>
 </div>
 
+<!-- Modal: Add New Security -->
+<div class="modal-backdrop" id="addModal">
+  <div class="modal">
+    <h2>Add New Security</h2>
+    <div class="form-group">
+      <label>Security ID / Ticker (e.g. 1174119 or SOXX)</label>
+      <input type="text" id="modalSecId" placeholder="1174119">
+    </div>
+    <div class="form-group">
+      <label>Fund Name / Description</label>
+      <input type="text" id="modalSecName" placeholder="KSM Indxx US Semiconductors">
+    </div>
+    <div class="form-group">
+      <label>Current Base Price (in ILS or USD)</label>
+      <input type="number" id="modalSecPrice" placeholder="125.50" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Currency</label>
+      <select id="modalSecCurrency">
+        <option value="ILS">Israeli Shekel (₪)</option>
+        <option value="USD">US Dollar ($)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeAddModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitNewSecurity()">Save Security</button>
+    </div>
+  </div>
+</div>
+
 <script>
+  const STORAGE_KEY = 'my_tase_securities_v1';
+
+  const DEFAULT_SECURITIES = [
+    { id: '1159250', name: 'iShares Core S&P 500', price: 249050, isUSD: false, p1d: 0.35, p1w: 1.12, p1m: -2.40, p6m: 9.80, p1y: 26.40 },
+    { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 85160, isUSD: false, p1d: 0.52, p1w: 1.85, p1m: -3.10, p6m: 11.20, p1y: 31.50 },
+    { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 4659, isUSD: false, p1d: 0.38, p1w: 1.05, p1m: -2.35, p6m: 9.65, p1y: 26.10 },
+    { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 1420, isUSD: false, p1d: 0.28, p1w: 0.90, p1m: -2.80, p6m: 6.40, p1y: 13.80 },
+    { id: '5133574', name: 'Harel Nasdaq Hedged', price: 1680, isUSD: false, p1d: 0.44, p1w: 1.45, p1m: -3.40, p6m: 7.90, p1y: 17.00 },
+    { id: '5140165', name: 'MTF MSCI World Hedged', price: 1310, isUSD: false, p1d: 0.15, p1w: 0.65, p1m: -2.00, p6m: 5.10, p1y: 14.10 },
+    { id: '5117759', name: 'Ayalon S&P 500 x3', price: 2190, isUSD: false, p1d: 0.95, p1w: 3.10, p1m: -8.60, p6m: 14.20, p1y: 34.50 },
+    { id: '5117684', name: 'Ayalon TA-125 x3', price: 1980, isUSD: false, p1d: 0.80, p1w: 2.70, p1m: -6.10, p6m: 18.50, p1y: 42.00 },
+    { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, p1d: 0.65, p1w: 2.20, p1m: -3.90, p6m: 12.80, p1y: 28.60 }
+  ];
+
   let securities = [];
   let selectedSecurityId = '';
   let chartInstances = {};
 
-  // Конвертация агорот биржи TASE в шекели ₪ (деление на 100)
   function formatPrice(val, isUSD) {
     if (val === undefined || val === null) return '—';
     if (isUSD) {
       return `$${val.toFixed(2)}`;
     }
-    // Если котировка TASE в агорот (обычно больше 100), конвертируем в ₪
     const priceInILS = val >= 100 ? val / 100 : val;
     return `${priceInILS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
   }
@@ -344,70 +471,165 @@
     return `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`;
   }
 
+  function saveSecuritiesToStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(securities));
+  }
+
+  function loadSecuritiesFromStorage() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse local storage securities', e);
+      }
+    }
+    return null;
+  }
+
   async function loadDataFromJSON() {
     const statusElem = document.getElementById('statusMessage');
     statusElem.innerText = 'Fetching latest market snapshot...';
     statusElem.style.color = 'var(--accent)';
+
+    // 1. Проверяем LocalStorage пользователя
+    const cached = loadSecuritiesFromStorage();
 
     try {
       const res = await fetch('./data.json?v=' + new Date().getTime());
       if (!res.ok) throw new Error('data.json not found');
 
       const rootData = await res.json();
-      securities = rootData.securities || [];
+      const serverSecurities = rootData.securities || [];
 
-      if (!securities.length) throw new Error('data.json is empty');
-
-      if (!selectedSecurityId || !securities.find(s => s.id === selectedSecurityId)) {
-        selectedSecurityId = securities[0].id;
+      if (cached) {
+        // Объединяем актуальные цены сервера с кастомным списком пользователя
+        securities = cached.map(localItem => {
+          const fresh = serverSecurities.find(s => s.id === localItem.id);
+          return fresh ? fresh : ensureHistory(localItem);
+        });
+      } else {
+        securities = serverSecurities.map(ensureHistory);
+        saveSecuritiesToStorage();
       }
 
       statusElem.innerText = `● Live data active (Updated: ${rootData.updated_at || 'Just now'})`;
       statusElem.style.color = 'var(--green)';
-
-      populateSelect();
-      updateDashboard();
-
     } catch (err) {
-      console.warn('Could not load data.json, falling back to embedded baseline:', err);
-      statusElem.innerText = '● Showing embedded baseline data';
+      console.warn('Could not load data.json, falling back to cached or default list:', err);
+      statusElem.innerText = '● Showing local browser portfolio list';
       statusElem.style.color = 'var(--text-muted)';
       
-      loadFallbackData();
+      securities = (cached || DEFAULT_SECURITIES).map(ensureHistory);
+      if (!cached) saveSecuritiesToStorage();
     }
-  }
 
-  // --- СПИСОК ФОНДОВ (ДЛЯ ДОБАВЛЕНИЯ / УДАЛЕНИЯ В БРАУЗЕРЕ) ---
-  function loadFallbackData() {
-    securities = [
-      { id: '1159250', name: 'iShares Core S&P 500', price: 249050, isUSD: false, p1d: 0.35, p1w: 1.12, p1m: -2.40, p6m: 9.80, p1y: 26.40, daily: makeFallbackHistory(249050, 0.264) },
-      { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 85160, isUSD: false, p1d: 0.52, p1w: 1.85, p1m: -3.10, p6m: 11.20, p1y: 31.50, daily: makeFallbackHistory(85160, 0.315) },
-      { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 4659, isUSD: false, p1d: 0.38, p1w: 1.05, p1m: -2.35, p6m: 9.65, p1y: 26.10, daily: makeFallbackHistory(4659, 0.261) },
-      { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 1420, isUSD: false, p1d: 0.28, p1w: 0.90, p1m: -2.80, p6m: 6.40, p1y: 13.80, daily: makeFallbackHistory(1420, 0.138) },
-      { id: '5133574', name: 'Harel Nasdaq Hedged', price: 1680, isUSD: false, p1d: 0.44, p1w: 1.45, p1m: -3.40, p6m: 7.90, p1y: 17.00, daily: makeFallbackHistory(1680, 0.170) },
-      { id: '5140165', name: 'MTF MSCI World Hedged', price: 1310, isUSD: false, p1d: 0.15, p1w: 0.65, p1m: -2.00, p6m: 5.10, p1y: 14.10, daily: makeFallbackHistory(1310, 0.141) },
-      { id: '5117759', name: 'Ayalon S&P 500 x3', price: 2190, isUSD: false, p1d: 0.95, p1w: 3.10, p1m: -8.60, p6m: 14.20, p1y: 34.50, daily: makeFallbackHistory(2190, 0.345) },
-      { id: '5117684', name: 'Ayalon TA-125 x3', price: 1980, isUSD: false, p1d: 0.80, p1w: 2.70, p1m: -6.10, p6m: 18.50, p1y: 42.00, daily: makeFallbackHistory(1980, 0.420) },
-      { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, p1d: 0.65, p1w: 2.20, p1m: -3.90, p6m: 12.80, p1y: 28.60, daily: makeFallbackHistory(48.50, 0.286) }
-    ];
-    selectedSecurityId = '1159250';
+    if (!selectedSecurityId || !securities.find(s => s.id === selectedSecurityId)) {
+      selectedSecurityId = securities[0].id;
+    }
+
     populateSelect();
     updateDashboard();
   }
 
-  function makeFallbackHistory(base, growth) {
-    const list = [];
+  function ensureHistory(s) {
+    if (s.daily && s.daily.length > 0) return s;
+    const base = s.price || 100;
+    const growth = (s.p1y || 15) / 100;
     const count = 260;
     const start = base / (1 + growth);
+    const daily = [];
     for (let i = 0; i < count; i++) {
       const prog = i / (count - 1);
       const d = new Date();
       d.setDate(d.getDate() - (count - i));
       const val = start + (base - start) * prog + Math.sin(prog * 10) * (base * 0.015);
-      list.push({ date: d.toISOString().split('T')[0], price: parseFloat(val.toFixed(2)) });
+      daily.push({ date: d.toISOString().split('T')[0], price: parseFloat(val.toFixed(2)) });
     }
-    list[list.length - 1].price = base;
-    return list;
+    daily[daily.length - 1].price = base;
+    return { ...s, daily };
+  }
+
+  function deleteSecurity(id, event) {
+    event.stopPropagation();
+    if (securities.length <= 1) {
+      alert('You must keep at least one security in the list.');
+      return;
+    }
+    if (confirm(`Remove security ${id} from your list?`)) {
+      securities = securities.filter(s => s.id !== id);
+      saveSecuritiesToStorage();
+      if (selectedSecurityId === id) {
+        selectedSecurityId = securities[0].id;
+      }
+      populateSelect();
+      updateDashboard();
+    }
+  }
+
+  function resetDefaults() {
+    if (confirm('Reset portfolio back to default list?')) {
+      localStorage.removeItem(STORAGE_KEY);
+      securities = DEFAULT_SECURITIES.map(ensureHistory);
+      selectedSecurityId = securities[0].id;
+      saveSecuritiesToStorage();
+      populateSelect();
+      updateDashboard();
+    }
+  }
+
+  function openAddModal() {
+    document.getElementById('modalSecId').value = '';
+    document.getElementById('modalSecName').value = '';
+    document.getElementById('modalSecPrice').value = '';
+    document.getElementById('addModal').style.display = 'flex';
+  }
+
+  function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+  }
+
+  function submitNewSecurity() {
+    const id = document.getElementById('modalSecId').value.trim();
+    const name = document.getElementById('modalSecName').value.trim();
+    const rawPrice = parseFloat(document.getElementById('modalSecPrice').value);
+    const isUSD = document.getElementById('modalSecCurrency').value === 'USD';
+
+    if (!id || !name || isNaN(rawPrice) || rawPrice <= 0) {
+      alert('Please fill out all fields with valid values.');
+      return;
+    }
+
+    if (securities.some(s => s.id.toLowerCase() === id.toLowerCase())) {
+      alert('A security with this ID already exists in your list.');
+      return;
+    }
+
+    // Для TASE, если ввели цену в шекелях, переводим в базовые агорот для сохранения единообразия
+    const storedPrice = !isUSD ? rawPrice * 100 : rawPrice;
+
+    const newSec = ensureHistory({
+      id: id,
+      name: name,
+      price: storedPrice,
+      isUSD: isUSD,
+      p1d: 0.25,
+      p1w: 1.10,
+      p1m: 2.40,
+      p6m: 7.80,
+      p1y: 16.50
+    });
+
+    securities.push(newSec);
+    saveSecuritiesToStorage();
+    selectedSecurityId = id;
+    
+    closeAddModal();
+    populateSelect();
+    updateDashboard();
   }
 
   function renderComparisonTable() {
@@ -430,6 +652,9 @@
         <td class="${s.p1m >= 0 ? 'up' : 'down'}">${formatPct(s.p1m)}</td>
         <td class="${s.p6m >= 0 ? 'up' : 'down'}">${formatPct(s.p6m)}</td>
         <td class="${s.p1y >= 0 ? 'up' : 'down'}">${formatPct(s.p1y)}</td>
+        <td style="text-align: center;">
+          <button class="btn-danger" title="Delete security" onclick="deleteSecurity('${s.id}', event)">✕</button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
@@ -468,7 +693,7 @@
     if (!s) return;
 
     document.getElementById('activeFundTitle').innerText = s.name;
-    document.getElementById('activeFundSymbol').innerText = s.id + (s.isUSD ? ' (NASDAQ)' : ' (TASE)');
+    document.getElementById('activeFundSymbol').innerText = s.id + (s.isUSD ? ' (NASDAQ/NYSE)' : ' (TASE)');
     document.getElementById('activeCurrentPrice').innerText = formatPrice(s.price, s.isUSD);
     
     const changeElem = document.getElementById('activePriceChange');
@@ -516,7 +741,6 @@
       chartInstances[canvasId].destroy();
     }
 
-    // Переводим массив данных для графиков в ₪ при отрисовке подсказок тултипа
     const convertedData = data.map(pt => (!isUSD && pt >= 100 ? pt / 100 : pt));
 
     chartInstances[canvasId] = new Chart(ctx, {
