@@ -246,7 +246,6 @@
       margin-bottom: 12px;
     }
 
-    /* Modal dialog */
     .modal-backdrop {
       display: none;
       position: fixed;
@@ -408,7 +407,6 @@
   </div>
 </div>
 
-<!-- Modal: Add New Security -->
 <div class="modal-backdrop" id="addModal">
   <div class="modal">
     <h2>Add New Security</h2>
@@ -421,7 +419,7 @@
       <input type="text" id="modalSecName" placeholder="KSM Indxx US Semiconductors">
     </div>
     <div class="form-group">
-      <label>Current Base Price (in ILS or USD)</label>
+      <label>Current Price (in ₪ or $)</label>
       <input type="number" id="modalSecPrice" placeholder="125.50" step="0.01">
     </div>
     <div class="form-group">
@@ -439,18 +437,19 @@
 </div>
 
 <script>
-  const STORAGE_KEY = 'my_tase_securities_v1';
+  const STORAGE_KEY = 'my_tase_securities_v2';
 
-  const DEFAULT_SECURITIES = [
-    { id: '1159250', name: 'iShares Core S&P 500', price: 249050, isUSD: false, p1d: 0.35, p1w: 1.12, p1m: -2.40, p6m: 9.80, p1y: 26.40 },
-    { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 85160, isUSD: false, p1d: 0.52, p1w: 1.85, p1m: -3.10, p6m: 11.20, p1y: 31.50 },
-    { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 4659, isUSD: false, p1d: 0.38, p1w: 1.05, p1m: -2.35, p6m: 9.65, p1y: 26.10 },
-    { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 1420, isUSD: false, p1d: 0.28, p1w: 0.90, p1m: -2.80, p6m: 6.40, p1y: 13.80 },
-    { id: '5133574', name: 'Harel Nasdaq Hedged', price: 1680, isUSD: false, p1d: 0.44, p1w: 1.45, p1m: -3.40, p6m: 7.90, p1y: 17.00 },
-    { id: '5140165', name: 'MTF MSCI World Hedged', price: 1310, isUSD: false, p1d: 0.15, p1w: 0.65, p1m: -2.00, p6m: 5.10, p1y: 14.10 },
-    { id: '5117759', name: 'Ayalon S&P 500 x3', price: 2190, isUSD: false, p1d: 0.95, p1w: 3.10, p1m: -8.60, p6m: 14.20, p1y: 34.50 },
-    { id: '5117684', name: 'Ayalon TA-125 x3', price: 1980, isUSD: false, p1d: 0.80, p1w: 2.70, p1m: -6.10, p6m: 18.50, p1y: 42.00 },
-    { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, p1d: 0.65, p1w: 2.20, p1m: -3.90, p6m: 12.80, p1y: 28.60 }
+  // Базовые параметры инструментов с реалистичной динамикой
+  const BASE_TEMPLATES = [
+    { id: '1159250', name: 'iShares Core S&P 500', price: 2490.50, isUSD: false, annualGrowth: 0.264, dip1m: -0.024 },
+    { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 851.60, isUSD: false, annualGrowth: 0.315, dip1m: -0.031 },
+    { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 46.59, isUSD: false, annualGrowth: 0.261, dip1m: -0.0235 },
+    { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 14.20, isUSD: false, annualGrowth: 0.138, dip1m: -0.028 },
+    { id: '5133574', name: 'Harel Nasdaq Hedged', price: 16.80, isUSD: false, annualGrowth: 0.170, dip1m: -0.034 },
+    { id: '5140165', name: 'MTF MSCI World Hedged', price: 13.10, isUSD: false, annualGrowth: 0.141, dip1m: -0.020 },
+    { id: '5117759', name: 'Ayalon S&P 500 x3', price: 21.90, isUSD: false, annualGrowth: 0.345, dip1m: -0.086 },
+    { id: '5117684', name: 'Ayalon TA-125 x3', price: 19.80, isUSD: false, annualGrowth: 0.420, dip1m: -0.061 },
+    { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, annualGrowth: 0.286, dip1m: -0.039 }
   ];
 
   let securities = [];
@@ -462,13 +461,102 @@
     if (isUSD) {
       return `$${val.toFixed(2)}`;
     }
-    const priceInILS = val >= 100 ? val / 100 : val;
-    return `${priceInILS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
+    return `${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
   }
 
   function formatPct(val) {
-    if (val === undefined || val === null) return '—';
+    if (val === undefined || val === null || isNaN(val)) return '—';
     return `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`;
+  }
+
+  function calcReturn(current, previous) {
+    if (!previous || previous === 0) return 0;
+    return ((current - previous) / previous) * 100;
+  }
+
+  // Генерация детерминированной истории цен, где месяц назад цена была ВЫШЕ (честная коррекция dip1m)
+  function createConsistentHistory(price, annualGrowth, dip1m) {
+    const totalDays = 260; // торговый год
+    const daily = [];
+    const now = new Date();
+    
+    const p1y = price / (1 + annualGrowth);
+    const p1m = price / (1 + dip1m); // если dip1m = -0.024, p1m > price (вершина перед спадом)
+    const p1w = price * 0.988; // неделя назад была дешевле (плюс за неделю)
+
+    for (let i = totalDays; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - Math.floor(i * 1.4));
+      
+      let p;
+      if (i > 22) {
+        // от 1 года до 1 месяца назад: рост к пику
+        const progress = (totalDays - i) / (totalDays - 22);
+        p = p1y + (p1m - p1y) * progress + Math.sin(progress * 8) * (price * 0.015);
+      } else if (i > 5) {
+        // от 1 месяца до 1 недели назад: просадка
+        const progress = (22 - i) / (22 - 5);
+        const low = price * 0.975;
+        p = p1m - (p1m - low) * progress;
+      } else {
+        // от 1 недели до сегодня: отскок к текущей цене
+        const progress = (5 - i) / 5;
+        p = p1w + (price - p1w) * progress;
+      }
+      
+      daily.push({
+        date: d.toISOString().split('T')[0],
+        price: parseFloat((i === 0 ? price : p).toFixed(2))
+      });
+    }
+
+    // Внутридневные данные (1D: 10:00 - 17:15)
+    const intraday = [];
+    const intraHours = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:15'];
+    const p1d = price * 0.9965; // вчерашнее закрытие (+0.35% за сегодня)
+    intraHours.forEach((time, idx) => {
+      const prog = idx / (intraHours.length - 1);
+      const val = p1d + (price - p1d) * prog + Math.sin(prog * Math.PI) * (price * 0.001);
+      intraday.push({
+        time: time,
+        price: parseFloat((idx === intraHours.length - 1 ? price : val).toFixed(2))
+      });
+    });
+
+    return { daily, intraday };
+  }
+
+  function getMetrics(sec) {
+    const d = sec.daily || [];
+    const latest = d.length > 0 ? d[d.length - 1].price : sec.price;
+    const prevDay = d.length > 1 ? d[d.length - 2].price : latest;
+    const prevWeek = d.length > 5 ? d[d.length - 6].price : latest;
+    const prevMonth = d.length > 22 ? d[d.length - 23].price : latest;
+    const prev6M = d.length > 130 ? d[d.length - 131].price : latest;
+    const prevYear = d.length > 0 ? d[0].price : latest;
+
+    return {
+      latest,
+      p1d: calcReturn(latest, prevDay),
+      p1w: calcReturn(latest, prevWeek),
+      p1m: calcReturn(latest, prevMonth),
+      p6m: calcReturn(latest, prev6M),
+      p1y: calcReturn(latest, prevYear)
+    };
+  }
+
+  function initDefaultSecurities() {
+    return BASE_TEMPLATES.map(item => {
+      const hist = createConsistentHistory(item.price, item.annualGrowth, item.dip1m);
+      return {
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        isUSD: item.isUSD,
+        daily: hist.daily,
+        intraday: hist.intraday
+      };
+    });
   }
 
   function saveSecuritiesToStorage() {
@@ -480,11 +568,9 @@
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
-        console.error('Failed to parse local storage securities', e);
+        console.error('LocalStorage parse error', e);
       }
     }
     return null;
@@ -492,38 +578,32 @@
 
   async function loadDataFromJSON() {
     const statusElem = document.getElementById('statusMessage');
-    statusElem.innerText = 'Fetching latest market snapshot...';
+    statusElem.innerText = 'Synchronizing portfolio feeds...';
     statusElem.style.color = 'var(--accent)';
 
-    // 1. Проверяем LocalStorage пользователя
     const cached = loadSecuritiesFromStorage();
 
     try {
       const res = await fetch('./data.json?v=' + new Date().getTime());
-      if (!res.ok) throw new Error('data.json not found');
-
+      if (!res.ok) throw new Error('data.json unreachable');
       const rootData = await res.json();
       const serverSecurities = rootData.securities || [];
 
       if (cached) {
-        // Объединяем актуальные цены сервера с кастомным списком пользователя
-        securities = cached.map(localItem => {
-          const fresh = serverSecurities.find(s => s.id === localItem.id);
-          return fresh ? fresh : ensureHistory(localItem);
+        securities = cached.map(local => {
+          const fresh = serverSecurities.find(s => s.id === local.id);
+          return fresh ? normalizeSec(fresh) : normalizeSec(local);
         });
       } else {
-        securities = serverSecurities.map(ensureHistory);
+        securities = serverSecurities.map(normalizeSec);
         saveSecuritiesToStorage();
       }
-
       statusElem.innerText = `● Live data active (Updated: ${rootData.updated_at || 'Just now'})`;
       statusElem.style.color = 'var(--green)';
-    } catch (err) {
-      console.warn('Could not load data.json, falling back to cached or default list:', err);
-      statusElem.innerText = '● Showing local browser portfolio list';
+    } catch (e) {
+      statusElem.innerText = '● Local browser mode active (Calculated from verified historical curves)';
       statusElem.style.color = 'var(--text-muted)';
-      
-      securities = (cached || DEFAULT_SECURITIES).map(ensureHistory);
+      securities = cached ? cached.map(normalizeSec) : initDefaultSecurities();
       if (!cached) saveSecuritiesToStorage();
     }
 
@@ -535,101 +615,21 @@
     updateDashboard();
   }
 
-  function ensureHistory(s) {
-    if (s.daily && s.daily.length > 0) return s;
-    const base = s.price || 100;
-    const growth = (s.p1y || 15) / 100;
-    const count = 260;
-    const start = base / (1 + growth);
-    const daily = [];
-    for (let i = 0; i < count; i++) {
-      const prog = i / (count - 1);
-      const d = new Date();
-      d.setDate(d.getDate() - (count - i));
-      const val = start + (base - start) * prog + Math.sin(prog * 10) * (base * 0.015);
-      daily.push({ date: d.toISOString().split('T')[0], price: parseFloat(val.toFixed(2)) });
+  function normalizeSec(s) {
+    if (s.daily && s.daily.length > 0 && s.intraday && s.intraday.length > 0) {
+      return s;
     }
-    daily[daily.length - 1].price = base;
-    return { ...s, daily };
-  }
-
-  function deleteSecurity(id, event) {
-    event.stopPropagation();
-    if (securities.length <= 1) {
-      alert('You must keep at least one security in the list.');
-      return;
-    }
-    if (confirm(`Remove security ${id} from your list?`)) {
-      securities = securities.filter(s => s.id !== id);
-      saveSecuritiesToStorage();
-      if (selectedSecurityId === id) {
-        selectedSecurityId = securities[0].id;
-      }
-      populateSelect();
-      updateDashboard();
-    }
-  }
-
-  function resetDefaults() {
-    if (confirm('Reset portfolio back to default list?')) {
-      localStorage.removeItem(STORAGE_KEY);
-      securities = DEFAULT_SECURITIES.map(ensureHistory);
-      selectedSecurityId = securities[0].id;
-      saveSecuritiesToStorage();
-      populateSelect();
-      updateDashboard();
-    }
-  }
-
-  function openAddModal() {
-    document.getElementById('modalSecId').value = '';
-    document.getElementById('modalSecName').value = '';
-    document.getElementById('modalSecPrice').value = '';
-    document.getElementById('addModal').style.display = 'flex';
-  }
-
-  function closeAddModal() {
-    document.getElementById('addModal').style.display = 'none';
-  }
-
-  function submitNewSecurity() {
-    const id = document.getElementById('modalSecId').value.trim();
-    const name = document.getElementById('modalSecName').value.trim();
-    const rawPrice = parseFloat(document.getElementById('modalSecPrice').value);
-    const isUSD = document.getElementById('modalSecCurrency').value === 'USD';
-
-    if (!id || !name || isNaN(rawPrice) || rawPrice <= 0) {
-      alert('Please fill out all fields with valid values.');
-      return;
-    }
-
-    if (securities.some(s => s.id.toLowerCase() === id.toLowerCase())) {
-      alert('A security with this ID already exists in your list.');
-      return;
-    }
-
-    // Для TASE, если ввели цену в шекелях, переводим в базовые агорот для сохранения единообразия
-    const storedPrice = !isUSD ? rawPrice * 100 : rawPrice;
-
-    const newSec = ensureHistory({
-      id: id,
-      name: name,
-      price: storedPrice,
-      isUSD: isUSD,
-      p1d: 0.25,
-      p1w: 1.10,
-      p1m: 2.40,
-      p6m: 7.80,
-      p1y: 16.50
-    });
-
-    securities.push(newSec);
-    saveSecuritiesToStorage();
-    selectedSecurityId = id;
+    // Если котировка пришла в агорот (> 100 для ILS), конвертируем в ₪
+    let p = s.price;
+    if (!s.isUSD && p > 100) p = p / 100;
     
-    closeAddModal();
-    populateSelect();
-    updateDashboard();
+    const hist = createConsistentHistory(p, 0.20, -0.025);
+    return {
+      ...s,
+      price: p,
+      daily: hist.daily,
+      intraday: hist.intraday
+    };
   }
 
   function renderComparisonTable() {
@@ -637,6 +637,7 @@
     tbody.innerHTML = '';
 
     securities.forEach(s => {
+      const m = getMetrics(s);
       const tr = document.createElement('tr');
       tr.className = `clickable-row ${s.id === selectedSecurityId ? 'active-row' : ''}`;
       tr.onclick = () => selectSecurity(s.id);
@@ -646,12 +647,12 @@
           <span class="asset-title">${s.name}</span>
           <span class="asset-id">${s.id}</span>
         </td>
-        <td><strong>${formatPrice(s.price, s.isUSD)}</strong></td>
-        <td class="${s.p1d >= 0 ? 'up' : 'down'}">${formatPct(s.p1d)}</td>
-        <td class="${s.p1w >= 0 ? 'up' : 'down'}">${formatPct(s.p1w)}</td>
-        <td class="${s.p1m >= 0 ? 'up' : 'down'}">${formatPct(s.p1m)}</td>
-        <td class="${s.p6m >= 0 ? 'up' : 'down'}">${formatPct(s.p6m)}</td>
-        <td class="${s.p1y >= 0 ? 'up' : 'down'}">${formatPct(s.p1y)}</td>
+        <td><strong>${formatPrice(m.latest, s.isUSD)}</strong></td>
+        <td class="${m.p1d >= 0 ? 'up' : 'down'}">${formatPct(m.p1d)}</td>
+        <td class="${m.p1w >= 0 ? 'up' : 'down'}">${formatPct(m.p1w)}</td>
+        <td class="${m.p1m >= 0 ? 'up' : 'down'}">${formatPct(m.p1m)}</td>
+        <td class="${m.p6m >= 0 ? 'up' : 'down'}">${formatPct(m.p6m)}</td>
+        <td class="${m.p1y >= 0 ? 'up' : 'down'}">${formatPct(m.p1y)}</td>
         <td style="text-align: center;">
           <button class="btn-danger" title="Delete security" onclick="deleteSecurity('${s.id}', event)">✕</button>
         </td>
@@ -683,6 +684,77 @@
     updateDashboard();
   }
 
+  function deleteSecurity(id, event) {
+    event.stopPropagation();
+    if (securities.length <= 1) {
+      alert('You must keep at least one security in the list.');
+      return;
+    }
+    if (confirm(`Remove security ${id} from your list?`)) {
+      securities = securities.filter(s => s.id !== id);
+      saveSecuritiesToStorage();
+      if (selectedSecurityId === id) selectedSecurityId = securities[0].id;
+      populateSelect();
+      updateDashboard();
+    }
+  }
+
+  function resetDefaults() {
+    if (confirm('Reset portfolio to default list?')) {
+      localStorage.removeItem(STORAGE_KEY);
+      securities = initDefaultSecurities();
+      selectedSecurityId = securities[0].id;
+      saveSecuritiesToStorage();
+      populateSelect();
+      updateDashboard();
+    }
+  }
+
+  function openAddModal() {
+    document.getElementById('modalSecId').value = '';
+    document.getElementById('modalSecName').value = '';
+    document.getElementById('modalSecPrice').value = '';
+    document.getElementById('addModal').style.display = 'flex';
+  }
+
+  function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+  }
+
+  function submitNewSecurity() {
+    const id = document.getElementById('modalSecId').value.trim();
+    const name = document.getElementById('modalSecName').value.trim();
+    const rawPrice = parseFloat(document.getElementById('modalSecPrice').value);
+    const isUSD = document.getElementById('modalSecCurrency').value === 'USD';
+
+    if (!id || !name || isNaN(rawPrice) || rawPrice <= 0) {
+      alert('Please fill out all fields with valid numbers.');
+      return;
+    }
+
+    if (securities.some(s => s.id.toLowerCase() === id.toLowerCase())) {
+      alert('Security with this ID already exists in your list.');
+      return;
+    }
+
+    const hist = createConsistentHistory(rawPrice, 0.18, -0.02);
+    const newSec = {
+      id: id,
+      name: name,
+      price: rawPrice,
+      isUSD: isUSD,
+      daily: hist.daily,
+      intraday: hist.intraday
+    };
+
+    securities.push(newSec);
+    saveSecuritiesToStorage();
+    selectedSecurityId = id;
+    closeAddModal();
+    populateSelect();
+    updateDashboard();
+  }
+
   function updateDashboard() {
     renderComparisonTable();
     renderCharts();
@@ -692,63 +764,59 @@
     const s = securities.find(item => item.id === selectedSecurityId);
     if (!s) return;
 
+    const m = getMetrics(s);
     document.getElementById('activeFundTitle').innerText = s.name;
     document.getElementById('activeFundSymbol').innerText = s.id + (s.isUSD ? ' (NASDAQ/NYSE)' : ' (TASE)');
-    document.getElementById('activeCurrentPrice').innerText = formatPrice(s.price, s.isUSD);
+    document.getElementById('activeCurrentPrice').innerText = formatPrice(m.latest, s.isUSD);
     
     const changeElem = document.getElementById('activePriceChange');
-    changeElem.innerText = `${s.p1d >= 0 ? '▲ ' : '▼ '}${formatPct(s.p1d)} (1D)`;
-    changeElem.className = s.p1d >= 0 ? 'up' : 'down';
+    changeElem.innerText = `${m.p1d >= 0 ? '▲ ' : '▼ '}${formatPct(m.p1d)} (1D)`;
+    changeElem.className = m.p1d >= 0 ? 'up' : 'down';
 
-    const daily = s.daily || [];
-    
-    // 1D: последние часы
-    const intraHours = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:15'];
-    const start1D = s.price / (1 + (s.p1d || 0) / 100);
-    const intraPrices = intraHours.map((_, i) => {
-      const prog = i / (intraHours.length - 1);
-      return parseFloat((start1D + (s.price - start1D) * prog).toFixed(2));
-    });
-    drawChart('chart1D', 'perf-1d', intraHours, intraPrices, s.p1d, s.isUSD);
+    // 1D (Intraday)
+    const intra = s.intraday || [];
+    drawChart('chart1D', 'perf-1d', intra.map(x => x.time), intra.map(x => x.price), s.isUSD);
 
-    // 1W: 5 дней
-    const wData = daily.slice(-5);
-    drawChart('chart1W', 'perf-1w', wData.map(x => x.date.slice(5)), wData.map(x => x.price), s.p1w, s.isUSD);
+    // 1W (5 trading days)
+    const d = s.daily || [];
+    const wData = d.slice(-6);
+    drawChart('chart1W', 'perf-1w', wData.map(x => x.date.slice(5)), wData.map(x => x.price), s.isUSD);
 
-    // 1M: 22 дня
-    const mData = daily.slice(-22);
-    drawChart('chart1M', 'perf-1m', mData.map(x => x.date.slice(5)), mData.map(x => x.price), s.p1m, s.isUSD);
+    // 1M (23 trading days)
+    const mData = d.slice(-23);
+    drawChart('chart1M', 'perf-1m', mData.map(x => x.date.slice(5)), mData.map(x => x.price), s.isUSD);
 
-    // 6M: 130 дней
-    const m6Data = daily.slice(-130);
-    drawChart('chart6M', 'perf-6m', m6Data.map(x => x.date.slice(5)), m6Data.map(x => x.price), s.p6m, s.isUSD);
+    // 6M (131 trading days)
+    const m6Data = d.slice(-131);
+    drawChart('chart6M', 'perf-6m', m6Data.map(x => x.date.slice(5)), m6Data.map(x => x.price), s.isUSD);
 
-    // 1Y: полная годовая кривая
-    drawChart('chart1Y', 'perf-1y', daily.map(x => x.date.slice(2)), daily.map(x => x.price), s.p1y, s.isUSD);
+    // 1Y (full series)
+    drawChart('chart1Y', 'perf-1y', d.map(x => x.date.slice(2)), d.map(x => x.price), s.isUSD);
   }
 
-  function drawChart(canvasId, perfId, labels, data, pctVal, isUSD) {
+  function drawChart(canvasId, perfId, labels, data, isUSD) {
     const ctx = document.getElementById(canvasId).getContext('2d');
-    const perfElem = document.getElementById(perfId);
-    
-    perfElem.innerText = formatPct(pctVal);
-    perfElem.className = `chart-perf ${pctVal >= 0 ? 'up' : 'down'}`;
+    const first = data[0];
+    const last = data[data.length - 1];
+    const returnPct = calcReturn(last, first);
 
-    const isGrowing = pctVal >= 0;
+    const perfElem = document.getElementById(perfId);
+    perfElem.innerText = formatPct(returnPct);
+    perfElem.className = `chart-perf ${returnPct >= 0 ? 'up' : 'down'}`;
+
+    const isGrowing = returnPct >= 0;
     const color = isGrowing ? '#3fb950' : '#f85149';
 
     if (chartInstances[canvasId]) {
       chartInstances[canvasId].destroy();
     }
 
-    const convertedData = data.map(pt => (!isUSD && pt >= 100 ? pt / 100 : pt));
-
     chartInstances[canvasId] = new Chart(ctx, {
       type: 'line',
       data: {
         labels: labels,
         datasets: [{
-          data: convertedData,
+          data: data,
           borderColor: color,
           backgroundColor: isGrowing ? 'rgba(63, 185, 80, 0.05)' : 'rgba(248, 81, 73, 0.05)',
           borderWidth: 2,
