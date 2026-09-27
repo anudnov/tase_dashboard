@@ -1,33 +1,561 @@
-async function loadDataFromJSON() {
-  const statusElem = document.getElementById('statusMessage');
-  statusElem.innerText = 'Fetching latest market snapshot...';
-  statusElem.style.color = 'var(--accent)';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TASE Securities Multi-Timeframe Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --card-inner: #1c212c;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+    }
 
-  try {
-    // Берём data.json прямо из корня GitHub Pages
-    const res = await fetch('./data.json?v=' + new Date().getTime());
-    if (!res.ok) throw new Error('Data file not found');
-    
-    const rootData = await res.json();
-    
-    // Заполняем массив securities реальными данными из файла
-    window.securities = rootData.securities;
-    
-    statusElem.innerText = `● Live data active (Updated: ${rootData.updated_at})`;
-    statusElem.style.color = 'var(--green)';
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
 
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 20px;
+      color: var(--text-bright);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    select, button {
+      background: #21262d;
+      color: var(--text-bright);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    button:hover, select:hover {
+      border-color: var(--accent);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 500;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr.clickable-row {
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    tr.clickable-row:hover {
+      background-color: var(--card-inner);
+    }
+
+    tr.active-row {
+      background-color: rgba(88, 166, 255, 0.1) !important;
+      border-left: 3px solid var(--accent);
+    }
+
+    .asset-title {
+      font-weight: 600;
+      color: var(--text-bright);
+      display: block;
+    }
+
+    .asset-id {
+      font-family: monospace;
+      color: var(--accent);
+      font-size: 11px;
+    }
+
+    .up { color: var(--green); font-weight: 600; }
+    .down { color: var(--red); font-weight: 600; }
+
+    .ticker-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .price-val {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    .charts-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .pair-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .pair-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-panel {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .chart-header h3 {
+      font-size: 14px;
+      color: var(--text-bright);
+      letter-spacing: 0.5px;
+    }
+
+    .chart-perf {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .canvas-wrapper-half {
+      position: relative;
+      height: 220px;
+      width: 100%;
+    }
+
+    .canvas-wrapper-full {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+
+    #statusMessage {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header Bar -->
+  <div class="card">
+    <header>
+      <div>
+        <h1>TASE Multi-Security Tracker & Charts</h1>
+        <span style="font-size: 12px; color: var(--text-muted);">Tel Aviv Stock Exchange • Automated GitHub Pages Feed</span>
+      </div>
+      <div class="controls">
+        <select id="fundSelect" onchange="onSelectChange()"></select>
+        <button onclick="loadDataFromJSON()">Refresh Data</button>
+      </div>
+    </header>
+  </div>
+
+  <!-- All Securities Matrix Table -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="font-size: 16px; color: var(--text-bright);">Securities Performance Matrix</h2>
+      <span style="font-size: 12px; color: var(--text-muted);">Click any row to display its charts</span>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Security / Ticker</th>
+            <th>Latest Price</th>
+            <th>1 Day</th>
+            <th>1 Week</th>
+            <th>1 Month</th>
+            <th>6 Months</th>
+            <th>1 Year</th>
+          </tr>
+        </thead>
+        <tbody id="comparisonTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Detailed Charts Stack for Active Security -->
+  <div class="card">
+    <div class="ticker-summary">
+      <div>
+        <h2 id="activeFundTitle" style="font-size: 18px; color: var(--text-bright);">—</h2>
+        <span id="activeFundSymbol" style="font-size: 12px; color: var(--text-muted); font-family: monospace;">—</span>
+      </div>
+      <div>
+        <span id="activeCurrentPrice" class="price-val">—</span>
+        <span id="activePriceChange" style="font-size: 14px; font-weight: 600; margin-left: 8px;"></span>
+      </div>
+    </div>
+
+    <div id="statusMessage">Initializing dashboard...</div>
+
+    <div class="charts-stack">
+      <!-- Row 1: 1 Day + 1 Week -->
+      <div class="pair-row">
+        <div class="chart-panel">
+          <div class="chart-header">
+            <h3>1 Day (1D) — Intraday</h3>
+            <span id="perf-1d" class="chart-perf">—</span>
+          </div>
+          <div class="canvas-wrapper-half"><canvas id="chart1D"></canvas></div>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-header">
+            <h3>1 Week (1W)</h3>
+            <span id="perf-1w" class="chart-perf">—</span>
+          </div>
+          <div class="canvas-wrapper-half"><canvas id="chart1W"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Row 2: 1 Month + 6 Months -->
+      <div class="pair-row">
+        <div class="chart-panel">
+          <div class="chart-header">
+            <h3>1 Month (1M)</h3>
+            <span id="perf-1m" class="chart-perf">—</span>
+          </div>
+          <div class="canvas-wrapper-half"><canvas id="chart1M"></canvas></div>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-header">
+            <h3>6 Months (6M)</h3>
+            <span id="perf-6m" class="chart-perf">—</span>
+          </div>
+          <div class="canvas-wrapper-half"><canvas id="chart6M"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Row 3: 1 Year (1Y) Full Width -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3>1 Year (1Y) — Complete Annual Trend (Full Width)</h3>
+          <span id="perf-1y" class="chart-perf">—</span>
+        </div>
+        <div class="canvas-wrapper-full"><canvas id="chart1Y"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let securities = [];
+  let selectedSecurityId = '';
+  let chartInstances = {};
+
+  function formatPrice(val, isUSD) {
+    if (val === undefined || val === null) return '—';
+    return isUSD ? `$${val.toFixed(2)}` : `${val.toLocaleString()} אג'`;
+  }
+
+  function formatPct(val) {
+    if (val === undefined || val === null) return '—';
+    return `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`;
+  }
+
+  async function loadDataFromJSON() {
+    const statusElem = document.getElementById('statusMessage');
+    statusElem.innerText = 'Fetching latest market snapshot...';
+    statusElem.style.color = 'var(--accent)';
+
+    try {
+      // Кэш-бастинг через таймстемп
+      const res = await fetch('./data.json?v=' + new Date().getTime());
+      if (!res.ok) throw new Error('data.json not found or unreachable');
+
+      const rootData = await res.json();
+      securities = rootData.securities || [];
+
+      if (!securities.length) {
+        throw new Error('data.json is empty');
+      }
+
+      if (!selectedSecurityId || !securities.find(s => s.id === selectedSecurityId)) {
+        selectedSecurityId = securities[0].id;
+      }
+
+      statusElem.innerText = `● Live data active (Updated: ${rootData.updated_at || 'Just now'})`;
+      statusElem.style.color = 'var(--green)';
+
+      populateSelect();
+      updateDashboard();
+
+    } catch (err) {
+      console.warn('Could not load data.json, falling back to embedded baseline:', err);
+      statusElem.innerText = '● Showing embedded fallback baseline (Check Actions to generate data.json)';
+      statusElem.style.color = 'var(--text-muted)';
+      
+      loadFallbackData();
+    }
+  }
+
+  function loadFallbackData() {
+    securities = [
+      { id: '1159250', name: 'iShares Core S&P 500', price: 249050, isUSD: false, p1d: 0.35, p1w: 1.12, p1m: -2.40, p6m: 9.80, p1y: 26.40, daily: makeFallbackHistory(249050, 0.264) },
+      { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 85160, isUSD: false, p1d: 0.52, p1w: 1.85, p1m: -3.10, p6m: 11.20, p1y: 31.50, daily: makeFallbackHistory(85160, 0.315) },
+      { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 4659, isUSD: false, p1d: 0.38, p1w: 1.05, p1m: -2.35, p6m: 9.65, p1y: 26.10, daily: makeFallbackHistory(4659, 0.261) },
+      { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 1420, isUSD: false, p1d: 0.28, p1w: 0.90, p1m: -2.80, p6m: 6.40, p1y: 13.80, daily: makeFallbackHistory(1420, 0.138) },
+      { id: '5133574', name: 'Harel Nasdaq Hedged', price: 1680, isUSD: false, p1d: 0.44, p1w: 1.45, p1m: -3.40, p6m: 7.90, p1y: 17.00, daily: makeFallbackHistory(1680, 0.170) },
+      { id: '5140165', name: 'MTF MSCI World Hedged', price: 1310, isUSD: false, p1d: 0.15, p1w: 0.65, p1m: -2.00, p6m: 5.10, p1y: 14.10, daily: makeFallbackHistory(1310, 0.141) },
+      { id: '5117759', name: 'Ayalon S&P 500 x3', price: 2190, isUSD: false, p1d: 0.95, p1w: 3.10, p1m: -8.60, p6m: 14.20, p1y: 34.50, daily: makeFallbackHistory(2190, 0.345) },
+      { id: '5117684', name: 'Ayalon TA-125 x3', price: 1980, isUSD: false, p1d: 0.80, p1w: 2.70, p1m: -6.10, p6m: 18.50, p1y: 42.00, daily: makeFallbackHistory(1980, 0.420) },
+      { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, p1d: 0.65, p1w: 2.20, p1m: -3.90, p6m: 12.80, p1y: 28.60, daily: makeFallbackHistory(48.50, 0.286) }
+    ];
+    selectedSecurityId = '1159250';
     populateSelect();
     updateDashboard();
-  } catch (err) {
-    console.error(err);
-    statusElem.innerText = '● Error loading data.json. Check Actions status.';
-    statusElem.style.color = 'var(--red)';
   }
-}
 
-// Заменяем refreshData():
-function refreshData() {
-  loadDataFromJSON();
-}
+  function makeFallbackHistory(base, growth) {
+    const list = [];
+    const count = 260;
+    const start = base / (1 + growth);
+    for (let i = 0; i < count; i++) {
+      const prog = i / (count - 1);
+      const d = new Date();
+      d.setDate(d.getDate() - (count - i));
+      const val = start + (base - start) * prog + Math.sin(prog * 10) * (base * 0.015);
+      list.push({ date: d.toISOString().split('T')[0], price: parseFloat(val.toFixed(2)) });
+    }
+    list[list.length - 1].price = base;
+    return list;
+  }
 
-window.onload = loadDataFromJSON;
+  function renderComparisonTable() {
+    const tbody = document.getElementById('comparisonTableBody');
+    tbody.innerHTML = '';
+
+    securities.forEach(s => {
+      const tr = document.createElement('tr');
+      tr.className = `clickable-row ${s.id === selectedSecurityId ? 'active-row' : ''}`;
+      tr.onclick = () => selectSecurity(s.id);
+
+      tr.innerHTML = `
+        <td>
+          <span class="asset-title">${s.name}</span>
+          <span class="asset-id">${s.id}</span>
+        </td>
+        <td><strong>${formatPrice(s.price, s.isUSD)}</strong></td>
+        <td class="${s.p1d >= 0 ? 'up' : 'down'}">${formatPct(s.p1d)}</td>
+        <td class="${s.p1w >= 0 ? 'up' : 'down'}">${formatPct(s.p1w)}</td>
+        <td class="${s.p1m >= 0 ? 'up' : 'down'}">${formatPct(s.p1m)}</td>
+        <td class="${s.p6m >= 0 ? 'up' : 'down'}">${formatPct(s.p6m)}</td>
+        <td class="${s.p1y >= 0 ? 'up' : 'down'}">${formatPct(s.p1y)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function populateSelect() {
+    const select = document.getElementById('fundSelect');
+    select.innerHTML = '';
+    securities.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.text = `${s.name} (${s.id})`;
+      if (s.id === selectedSecurityId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function onSelectChange() {
+    selectedSecurityId = document.getElementById('fundSelect').value;
+    updateDashboard();
+  }
+
+  function selectSecurity(id) {
+    selectedSecurityId = id;
+    document.getElementById('fundSelect').value = id;
+    updateDashboard();
+  }
+
+  function updateDashboard() {
+    renderComparisonTable();
+    renderCharts();
+  }
+
+  function renderCharts() {
+    const s = securities.find(item => item.id === selectedSecurityId);
+    if (!s) return;
+
+    document.getElementById('activeFundTitle').innerText = s.name;
+    document.getElementById('activeFundSymbol').innerText = s.id + (s.isUSD ? ' (NASDAQ)' : ' (TASE)');
+    document.getElementById('activeCurrentPrice').innerText = formatPrice(s.price, s.isUSD);
+    
+    const changeElem = document.getElementById('activePriceChange');
+    changeElem.innerText = `${s.p1d >= 0 ? '▲ ' : '▼ '}${formatPct(s.p1d)} (1D)`;
+    changeElem.className = s.p1d >= 0 ? 'up' : 'down';
+
+    const daily = s.daily || [];
+    
+    // 1. Chart 1D: последние часы торговой сессии
+    const intraHours = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:15'];
+    const start1D = s.price / (1 + (s.p1d || 0) / 100);
+    const intraPrices = intraHours.map((_, i) => {
+      const prog = i / (intraHours.length - 1);
+      return parseFloat((start1D + (s.price - start1D) * prog).toFixed(2));
+    });
+    drawChart('chart1D', 'perf-1d', intraHours, intraPrices, s.p1d, s.isUSD);
+
+    // 2. Chart 1W: последние 5 сессий
+    const wData = daily.slice(-5);
+    drawChart('chart1W', 'perf-1w', wData.map(x => x.date.slice(5)), wData.map(x => x.price), s.p1w, s.isUSD);
+
+    // 3. Chart 1M: последние 22 сессии
+    const mData = daily.slice(-22);
+    drawChart('chart1M', 'perf-1m', mData.map(x => x.date.slice(5)), mData.map(x => x.price), s.p1m, s.isUSD);
+
+    // 4. Chart 6M: последние 130 сессий
+    const m6Data = daily.slice(-130);
+    drawChart('chart6M', 'perf-6m', m6Data.map(x => x.date.slice(5)), m6Data.map(x => x.price), s.p6m, s.isUSD);
+
+    // 5. Chart 1Y: полная годовая история
+    drawChart('chart1Y', 'perf-1y', daily.map(x => x.date.slice(2)), daily.map(x => x.price), s.p1y, s.isUSD);
+  }
+
+  function drawChart(canvasId, perfId, labels, data, pctVal, isUSD) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const perfElem = document.getElementById(perfId);
+    
+    perfElem.innerText = formatPct(pctVal);
+    perfElem.className = `chart-perf ${pctVal >= 0 ? 'up' : 'down'}`;
+
+    const isGrowing = pctVal >= 0;
+    const color = isGrowing ? '#3fb950' : '#f85149';
+
+    if (chartInstances[canvasId]) {
+      chartInstances[canvasId].destroy();
+    }
+
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          borderColor: color,
+          backgroundColor: isGrowing ? 'rgba(63, 185, 80, 0.05)' : 'rgba(248, 81, 73, 0.05)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.15,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: { color: '#8b949e', maxTicksLimit: canvasId === 'chart1Y' ? 12 : 6, font: { size: 10 } },
+            grid: { color: '#21262d' }
+          },
+          y: {
+            ticks: { color: '#8b949e', font: { size: 10 } },
+            grid: { color: '#30363d' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${formatPrice(ctx.parsed.y, isUSD)}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  window.onload = loadDataFromJSON;
+</script>
+</body>
+</html>
