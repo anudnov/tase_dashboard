@@ -41,7 +41,26 @@ MAX_HISTORY_DAYS = 365 * 5  # сколько истории хранить в da
 
 # ---------------------------------------------------------------- HTTP
 
+try:
+    # curl_cffi повторяет TLS-отпечаток настоящего Chrome — Cloudflare реже блокирует.
+    from curl_cffi import requests as cffi_requests
+except ImportError:
+    cffi_requests = None
+
+
+class HTTPStatusError(Exception):
+    def __init__(self, url, code, server, body):
+        super().__init__(f"{url}: HTTP {code}; server={server}; body={body[:120]!r}")
+        self.code = code
+
+
 def http_get(url, timeout=20):
+    if cffi_requests is not None:
+        r = cffi_requests.get(url, impersonate="chrome", timeout=timeout,
+                              headers={"Accept-Language": "he-IL,he;q=0.9,en;q=0.8"})
+        if r.status_code >= 400:
+            raise HTTPStatusError(url, r.status_code, r.headers.get("server"), r.text)
+        return str(r.url), r.text
     req = urllib.request.Request(url, headers={
         "User-Agent": UA,
         "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
@@ -108,9 +127,13 @@ def fetch_tase(sec_id, attempts=4):
         for i in range(attempts):
             try:
                 final_url, html = http_get(url)
-            except urllib.error.HTTPError as e:
-                last_err = f"{url}: HTTP {e.code} {e.reason}; server={e.headers.get('Server')}; body={e.read()[:200]!r}"
-                if e.code in (401, 403, 429):
+            except (urllib.error.HTTPError, HTTPStatusError) as e:
+                code = getattr(e, "code", None)
+                if isinstance(e, urllib.error.HTTPError):
+                    last_err = f"{url}: HTTP {code}; server={e.headers.get('Server')}"
+                else:
+                    last_err = str(e)
+                if code in (401, 403, 429):
                     raise RuntimeError(last_err)  # блокировка — повторять бессмысленно
                 time.sleep(2 + 2 * i)
                 continue
@@ -245,6 +268,7 @@ def load_previous():
 
 
 def main():
+    print("HTTP client:", "curl_cffi (Chrome impersonation)" if cffi_requests else "urllib")
     with open(CONFIG_FILE, encoding="utf-8") as f:
         config = json.load(f)
 
