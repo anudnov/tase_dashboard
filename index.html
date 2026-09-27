@@ -1,0 +1,33 @@
+async function loadDataFromJSON() {
+  const statusElem = document.getElementById('statusMessage');
+  statusElem.innerText = 'Fetching latest market snapshot...';
+  statusElem.style.color = 'var(--accent)';
+
+  try {
+    // Берём data.json прямо из корня GitHub Pages
+    const res = await fetch('./data.json?v=' + new Date().getTime());
+    if (!res.ok) throw new Error('Data file not found');
+    
+    const rootData = await res.json();
+    
+    // Заполняем массив securities реальными данными из файла
+    window.securities = rootData.securities;
+    
+    statusElem.innerText = `● Live data active (Updated: ${rootData.updated_at})`;
+    statusElem.style.color = 'var(--green)';
+
+    populateSelect();
+    updateDashboard();
+  } catch (err) {
+    console.error(err);
+    statusElem.innerText = '● Error loading data.json. Check Actions status.';
+    statusElem.style.color = 'var(--red)';
+  }
+}
+
+// Заменяем refreshData():
+function refreshData() {
+  loadDataFromJSON();
+}
+
+window.onload = loadDataFromJSON;
