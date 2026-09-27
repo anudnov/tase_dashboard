@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache">
   <title>TASE Securities Multi-Timeframe Monitor</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
@@ -247,6 +248,8 @@
     }
 
     .amber { color: #d29922; font-weight: 600; }
+    td.nowrap, td.num { white-space: nowrap; }
+    @media (max-width: 600px) { body { padding: 12px; } .card { padding: 14px; } td, th { padding: 8px 6px; } }
     .muted { color: var(--text-muted); }
     .badge {
       display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px;
@@ -266,7 +269,7 @@
     <header>
       <div>
         <h1>TASE Multi-Security Tracker & Charts</h1>
-        <span style="font-size: 12px; color: var(--text-muted);">Real end-of-day prices • Bizportal / TASE / Funder (Israel) + Yahoo Finance (US)</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Real end-of-day prices • TASE / Maya (Israel) + Yahoo Finance (US)</span>
       </div>
       <div class="controls">
         <select id="fundSelect" onchange="selectSecurity(this.value)"></select>
@@ -389,6 +392,11 @@
     const d = new Date(isoDate + 'T12:00:00Z');
     return Math.floor((Date.now() - d.getTime()) / 86400000);
   }
+  function shortDate(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y.slice(2)}`;
+  }
   function isStale(s) {
     return !s.fetch_ok || daysSince(s.as_of) > STALE_DAYS;
   }
@@ -465,15 +473,15 @@
       tr.onclick = () => selectSecurity(s.id);
       const cells = PERIOD_KEYS.map(k => {
         const v = p[k] ? p[k].pct : null;
-        return `<td class="${pctClass(v)}" title="${p[k] && p[k].from ? 'from ' + p[k].from : 'not enough history'}">${formatPct(v)}</td>`;
+        return `<td class="num ${pctClass(v)}" title="${p[k] && p[k].from ? 'from ' + p[k].from : 'not enough history'}">${formatPct(v)}</td>`;
       }).join('');
       tr.innerHTML = `
         <td>
           <span class="asset-title">${esc(s.name)}</span>
           <span class="asset-id">${s.source_url ? `<a href="${esc(s.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(s.id)}</a>` : esc(s.id)}</span>
         </td>
-        <td><strong>${formatPrice(s.price, s.currency)}</strong></td>
-        <td class="${stale ? 'amber' : 'muted'}">${esc(s.as_of)}${stale ? '<span class="badge">stale</span>' : ''}</td>
+        <td class="num"><strong>${formatPrice(s.price, s.currency)}</strong></td>
+        <td class="nowrap ${stale ? 'amber' : 'muted'}" title="${esc(s.as_of)}">${shortDate(s.as_of)}${stale ? '<span class="badge">stale</span>' : ''}</td>
         ${cells}
         <td style="text-align: center;"><button class="btn-danger" title="Hide in this browser" onclick="hideSecurity('${esc(s.id)}', event)">✕</button></td>`;
       tbody.appendChild(tr);
