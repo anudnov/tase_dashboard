@@ -440,16 +440,18 @@
   const STORAGE_KEY = 'my_tase_securities_v2';
 
   // Базовые параметры инструментов с реалистичной динамикой
-  const BASE_TEMPLATES = [
-    { id: '1159250', name: 'iShares Core S&P 500', price: 2490.50, isUSD: false, annualGrowth: 0.264, dip1m: -0.024 },
-    { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 851.60, isUSD: false, annualGrowth: 0.315, dip1m: -0.031 },
-    { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 46.59, isUSD: false, annualGrowth: 0.261, dip1m: -0.0235 },
-    { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 14.20, isUSD: false, annualGrowth: 0.138, dip1m: -0.028 },
-    { id: '5133574', name: 'Harel Nasdaq Hedged', price: 16.80, isUSD: false, annualGrowth: 0.170, dip1m: -0.034 },
-    { id: '5140165', name: 'MTF MSCI World Hedged', price: 13.10, isUSD: false, annualGrowth: 0.141, dip1m: -0.020 },
-    { id: '5117759', name: 'Ayalon S&P 500 x3', price: 21.90, isUSD: false, annualGrowth: 0.345, dip1m: -0.086 },
-    { id: '5117684', name: 'Ayalon TA-125 x3', price: 19.80, isUSD: false, annualGrowth: 0.420, dip1m: -0.061 },
-    { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, annualGrowth: 0.286, dip1m: -0.039 }
+const BASE_TEMPLATES = [
+    // Фактические данные Globes по iShares Core S&P 500:
+    // Цена 2,522.00 ₪, за день -0.20%, за месяц +2.11%
+    { id: '1159250', name: 'iShares Core S&P 500', price: 2522.00, isUSD: false, annualGrowth: 0.264, dip1m: 0.0211 },
+    { id: '1146505', name: 'KSM ETF NASDAQ 100', price: 851.60, isUSD: false, annualGrowth: 0.315, dip1m: 0.024 },
+    { id: '1183441', name: 'Invesco S&P 500 UCITS', price: 46.59, isUSD: false, annualGrowth: 0.261, dip1m: 0.021 },
+    { id: '5122957', name: 'Kessem S&P 500 Hedged', price: 14.20, isUSD: false, annualGrowth: 0.138, dip1m: 0.015 },
+    { id: '5133574', name: 'Harel Nasdaq Hedged', price: 16.80, isUSD: false, annualGrowth: 0.170, dip1m: 0.018 },
+    { id: '5140165', name: 'MTF MSCI World Hedged', price: 13.10, isUSD: false, annualGrowth: 0.141, dip1m: 0.012 },
+    { id: '5117759', name: 'Ayalon S&P 500 x3', price: 21.90, isUSD: false, annualGrowth: 0.345, dip1m: 0.055 },
+    { id: '5117684', name: 'Ayalon TA-125 x3', price: 19.80, isUSD: false, annualGrowth: 0.420, dip1m: 0.040 },
+    { id: 'MAGS', name: 'Roundhill Mag 7 ETF', price: 48.50, isUSD: true, annualGrowth: 0.286, dip1m: 0.025 }
   ];
 
   let securities = [];
