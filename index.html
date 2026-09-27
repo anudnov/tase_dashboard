@@ -222,12 +222,11 @@
 <body>
 
 <div class="container">
-  <!-- Header Bar -->
   <div class="card">
     <header>
       <div>
         <h1>TASE Multi-Security Tracker & Charts</h1>
-        <span style="font-size: 12px; color: var(--text-muted);">Tel Aviv Stock Exchange • Automated GitHub Pages Feed</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Tel Aviv Stock Exchange • Multi-Timeframe Monitor</span>
       </div>
       <div class="controls">
         <select id="fundSelect" onchange="onSelectChange()"></select>
@@ -236,7 +235,6 @@
     </header>
   </div>
 
-  <!-- All Securities Matrix Table -->
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <h2 style="font-size: 16px; color: var(--text-bright);">Securities Performance Matrix</h2>
@@ -260,7 +258,6 @@
     </div>
   </div>
 
-  <!-- Detailed Charts Stack for Active Security -->
   <div class="card">
     <div class="ticker-summary">
       <div>
@@ -331,9 +328,15 @@
   let selectedSecurityId = '';
   let chartInstances = {};
 
+  // Конвертация агорот биржи TASE в шекели ₪ (деление на 100)
   function formatPrice(val, isUSD) {
     if (val === undefined || val === null) return '—';
-    return isUSD ? `$${val.toFixed(2)}` : `${val.toLocaleString()} אג'`;
+    if (isUSD) {
+      return `$${val.toFixed(2)}`;
+    }
+    // Если котировка TASE в агорот (обычно больше 100), конвертируем в ₪
+    const priceInILS = val >= 100 ? val / 100 : val;
+    return `${priceInILS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
   }
 
   function formatPct(val) {
@@ -347,16 +350,13 @@
     statusElem.style.color = 'var(--accent)';
 
     try {
-      // Кэш-бастинг через таймстемп
       const res = await fetch('./data.json?v=' + new Date().getTime());
-      if (!res.ok) throw new Error('data.json not found or unreachable');
+      if (!res.ok) throw new Error('data.json not found');
 
       const rootData = await res.json();
       securities = rootData.securities || [];
 
-      if (!securities.length) {
-        throw new Error('data.json is empty');
-      }
+      if (!securities.length) throw new Error('data.json is empty');
 
       if (!selectedSecurityId || !securities.find(s => s.id === selectedSecurityId)) {
         selectedSecurityId = securities[0].id;
@@ -370,13 +370,14 @@
 
     } catch (err) {
       console.warn('Could not load data.json, falling back to embedded baseline:', err);
-      statusElem.innerText = '● Showing embedded fallback baseline (Check Actions to generate data.json)';
+      statusElem.innerText = '● Showing embedded baseline data';
       statusElem.style.color = 'var(--text-muted)';
       
       loadFallbackData();
     }
   }
 
+  // --- СПИСОК ФОНДОВ (ДЛЯ ДОБАВЛЕНИЯ / УДАЛЕНИЯ В БРАУЗЕРЕ) ---
   function loadFallbackData() {
     securities = [
       { id: '1159250', name: 'iShares Core S&P 500', price: 249050, isUSD: false, p1d: 0.35, p1w: 1.12, p1m: -2.40, p6m: 9.80, p1y: 26.40, daily: makeFallbackHistory(249050, 0.264) },
@@ -476,7 +477,7 @@
 
     const daily = s.daily || [];
     
-    // 1. Chart 1D: последние часы торговой сессии
+    // 1D: последние часы
     const intraHours = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:15'];
     const start1D = s.price / (1 + (s.p1d || 0) / 100);
     const intraPrices = intraHours.map((_, i) => {
@@ -485,19 +486,19 @@
     });
     drawChart('chart1D', 'perf-1d', intraHours, intraPrices, s.p1d, s.isUSD);
 
-    // 2. Chart 1W: последние 5 сессий
+    // 1W: 5 дней
     const wData = daily.slice(-5);
     drawChart('chart1W', 'perf-1w', wData.map(x => x.date.slice(5)), wData.map(x => x.price), s.p1w, s.isUSD);
 
-    // 3. Chart 1M: последние 22 сессии
+    // 1M: 22 дня
     const mData = daily.slice(-22);
     drawChart('chart1M', 'perf-1m', mData.map(x => x.date.slice(5)), mData.map(x => x.price), s.p1m, s.isUSD);
 
-    // 4. Chart 6M: последние 130 сессий
+    // 6M: 130 дней
     const m6Data = daily.slice(-130);
     drawChart('chart6M', 'perf-6m', m6Data.map(x => x.date.slice(5)), m6Data.map(x => x.price), s.p6m, s.isUSD);
 
-    // 5. Chart 1Y: полная годовая история
+    // 1Y: полная годовая кривая
     drawChart('chart1Y', 'perf-1y', daily.map(x => x.date.slice(2)), daily.map(x => x.price), s.p1y, s.isUSD);
   }
 
@@ -515,12 +516,15 @@
       chartInstances[canvasId].destroy();
     }
 
+    // Переводим массив данных для графиков в ₪ при отрисовке подсказок тултипа
+    const convertedData = data.map(pt => (!isUSD && pt >= 100 ? pt / 100 : pt));
+
     chartInstances[canvasId] = new Chart(ctx, {
       type: 'line',
       data: {
         labels: labels,
         datasets: [{
-          data: data,
+          data: convertedData,
           borderColor: color,
           backgroundColor: isGrowing ? 'rgba(63, 185, 80, 0.05)' : 'rgba(248, 81, 73, 0.05)',
           borderWidth: 2,
@@ -539,7 +543,11 @@
             grid: { color: '#21262d' }
           },
           y: {
-            ticks: { color: '#8b949e', font: { size: 10 } },
+            ticks: {
+              color: '#8b949e',
+              font: { size: 10 },
+              callback: val => isUSD ? `$${val}` : `${val} ₪`
+            },
             grid: { color: '#30363d' }
           }
         },
