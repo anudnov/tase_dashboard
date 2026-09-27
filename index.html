@@ -266,7 +266,7 @@
     <header>
       <div>
         <h1>TASE Multi-Security Tracker & Charts</h1>
-        <span style="font-size: 12px; color: var(--text-muted);">Real end-of-day prices • funder.co.il (TASE) + Yahoo Finance (US)</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Real end-of-day prices • Bizportal / TASE / Funder (Israel) + Yahoo Finance (US)</span>
       </div>
       <div class="controls">
         <select id="fundSelect" onchange="selectSecurity(this.value)"></select>
@@ -510,7 +510,7 @@
 
     document.getElementById('activeFundTitle').textContent = s.name;
     document.getElementById('activeFundSymbol').textContent =
-      `${s.id} • ${s.currency === 'USD' ? 'USD (Yahoo Finance)' : 'TASE / ILS (funder.co.il)'} • last close ${s.as_of}`;
+      `${s.id} • ${s.currency === 'USD' ? 'USD' : 'TASE / ILS'} • source: ${s.data_source || '?'} • last close ${s.as_of}`;
     document.getElementById('activeCurrentPrice').textContent = formatPrice(s.price, s.currency);
     const ch = document.getElementById('activePriceChange');
     const d1 = p['1d'] ? p['1d'].pct : null;
