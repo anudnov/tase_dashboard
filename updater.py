@@ -18,6 +18,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
@@ -107,8 +108,14 @@ def fetch_tase(sec_id, attempts=4):
         for i in range(attempts):
             try:
                 final_url, html = http_get(url)
-            except Exception as e:  # сеть / 5xx
-                last_err = f"{url}: {e}"
+            except urllib.error.HTTPError as e:
+                last_err = f"{url}: HTTP {e.code} {e.reason}; server={e.headers.get('Server')}; body={e.read()[:200]!r}"
+                if e.code in (401, 403, 429):
+                    raise RuntimeError(last_err)  # блокировка — повторять бессмысленно
+                time.sleep(2 + 2 * i)
+                continue
+            except Exception as e:  # сеть / таймаут
+                last_err = f"{url}: {type(e).__name__}: {e}"
                 time.sleep(2 + 2 * i)
                 continue
             if "page404" in final_url:
@@ -244,7 +251,7 @@ def main():
     previous = load_previous()
     now = datetime.now(timezone.utc)
     cutoff = (now.date() - timedelta(days=MAX_HISTORY_DAYS)).isoformat()
-    result, failures = [], []
+    result, failures, errors = [], [], {}
 
     for s in config:
         sid, source = s["id"], s.get("source", "tase")
@@ -256,6 +263,7 @@ def main():
         except Exception as e:
             print(f"   ! fetch failed: {e}")
             failures.append(sid)
+            errors[sid] = str(e)[:400]
             if not old:
                 continue
             fetched = {"points": [], "ref": old.get("source_returns", {}),
@@ -303,6 +311,7 @@ def main():
         "schema_version": SCHEMA_VERSION,
         "updated_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
         "failures": failures,
+        "errors": errors,
         "securities": result,
     }
     with open(DATA_FILE, "w", encoding="utf-8") as f:
