@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "updated_at": "2026-09-27 09:13:56 UTC",
+ "updated_at": "2026-09-27 10:05:34 UTC",
  "failures": [
   "1159250",
   "1146505",
@@ -11,6 +11,16 @@
   "5117759",
   "5117684"
  ],
+ "errors": {
+  "1159250": "https://www.funder.co.il/fund/1159250: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "1146505": "https://www.funder.co.il/fund/1146505: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "1183441": "https://www.funder.co.il/fund/1183441: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "5122957": "https://www.funder.co.il/fund/5122957: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "5133574": "https://www.funder.co.il/fund/5133574: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "5140165": "https://www.funder.co.il/fund/5140165: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "5117759": "https://www.funder.co.il/fund/5117759: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '",
+  "5117684": "https://www.funder.co.il/fund/5117684: HTTP 403 Forbidden; server=cloudflare; body=b'\\n<html>\\n<head>\\n    <style>\\n        * {\\n            margin: 0;\\n            padding: 0;\\n        }\\n        .imgbox {\\n            display: grid;\\n            height: 100%;\\n        }\\n        .center-fit {\\n '"
+ },
  "securities": [
   {
    "id": "MAGS",
