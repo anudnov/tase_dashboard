@@ -415,6 +415,8 @@
       let msg = `● Data file generated: ${updated}`;
       if (!isNaN(ageH)) msg += ` (${ageH < 48 ? Math.round(ageH) + ' h' : Math.round(ageH / 24) + ' days'} ago)`;
       if (failures.length) msg += ` • failed to refresh: ${failures.join(', ')}`;
+      const errs = root.errors || {};
+      if (Object.keys(errs).length) { const first = Object.values(errs)[0]; msg += ` • reason: ${first}`; }
       status.textContent = msg;
       status.style.color = (failures.length || ageH > 72) ? '#d29922' : 'var(--green)';
     } catch (err) {
