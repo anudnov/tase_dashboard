@@ -528,22 +528,24 @@ const BASE_TEMPLATES = [
     return { daily, intraday };
   }
 
-  function getMetrics(sec) {
+function getMetrics(sec) {
     const d = sec.daily || [];
     const latest = d.length > 0 ? d[d.length - 1].price : sec.price;
-    const prevDay = d.length > 1 ? d[d.length - 2].price : latest;
     const prevWeek = d.length > 5 ? d[d.length - 6].price : latest;
     const prevMonth = d.length > 22 ? d[d.length - 23].price : latest;
     const prev6M = d.length > 130 ? d[d.length - 131].price : latest;
     const prevYear = d.length > 0 ? d[0].price : latest;
 
+    // Если у фонда явно задан реальный p1d (например -0.20%), берем его напрямую
+    const dayChange = (sec.p1d !== undefined) ? sec.p1d : (d.length > 1 ? calcReturn(latest, d[d.length - 2].price) : 0);
+
     return {
       latest,
-      p1d: calcReturn(latest, prevDay),
-      p1w: calcReturn(latest, prevWeek),
-      p1m: calcReturn(latest, prevMonth),
-      p6m: calcReturn(latest, prev6M),
-      p1y: calcReturn(latest, prevYear)
+      p1d: dayChange,
+      p1w: (sec.p1w !== undefined) ? sec.p1w : calcReturn(latest, prevWeek),
+      p1m: (sec.p1m !== undefined) ? sec.p1m : calcReturn(latest, prevMonth),
+      p6m: (sec.p6m !== undefined) ? sec.p6m : calcReturn(latest, prev6M),
+      p1y: (sec.p1y !== undefined) ? sec.p1y : calcReturn(latest, prevYear)
     };
   }
 
