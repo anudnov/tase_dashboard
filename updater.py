@@ -2,8 +2,8 @@
 TASE dashboard updater.
 
 Берёт РЕАЛЬНЫЕ исторические цены закрытия:
-  * израильские бумаги (קרנות נאמנות / קרנות סל / קרנות חוץ) — со страниц funder.co.il
-    (в HTML встроены JSON-переменные fundGraphData / fundData);
+  * израильские бумаги (קרנות נאמנות / קרנות סל / קרנות חוץ) — по очереди из
+    Bizportal (JSON-график), официального API TASE (только торгуемые бумаги) и Funder;
   * американские тикеры — с Yahoo Finance.
 
 Ничего не "досчитывает" и не рисует синтетику: если данных нет — поле будет null,
@@ -54,20 +54,29 @@ class HTTPStatusError(Exception):
         self.code = code
 
 
-def http_get(url, timeout=20):
+def http_get(url, timeout=20, headers=None, json_body=None):
+    """GET (или POST, если передан json_body). Возвращает (final_url, text)."""
+    hdrs = {"Accept-Language": "he-IL,he;q=0.9,en;q=0.8"}
+    hdrs.update(headers or {})
+    data = json.dumps(json_body).encode() if json_body is not None else None
+    if data is not None:
+        hdrs["Content-Type"] = "application/json"
     if cffi_requests is not None:
-        r = cffi_requests.get(url, impersonate="chrome", timeout=timeout,
-                              headers={"Accept-Language": "he-IL,he;q=0.9,en;q=0.8"})
+        if data is None:
+            r = cffi_requests.get(url, impersonate="chrome", timeout=timeout, headers=hdrs)
+        else:
+            r = cffi_requests.post(url, impersonate="chrome", timeout=timeout, headers=hdrs, data=data)
         if r.status_code >= 400:
             raise HTTPStatusError(url, r.status_code, r.headers.get("server"), r.text)
         return str(r.url), r.text
-    req = urllib.request.Request(url, headers={
-        "User-Agent": UA,
-        "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
-        "Accept-Language": "he-IL,he;q=0.9,en;q=0.8",
-    })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.geturl(), resp.read().decode("utf-8", errors="ignore")
+    hdrs.setdefault("User-Agent", UA)
+    hdrs.setdefault("Accept", "text/html,application/json;q=0.9,*/*;q=0.8")
+    req = urllib.request.Request(url, headers=hdrs, data=data)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.geturl(), resp.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as e:
+        raise HTTPStatusError(url, e.code, e.headers.get("Server"), e.read().decode("utf-8", "ignore"))
 
 
 # ---------------------------------------------------------------- Funder
@@ -118,8 +127,8 @@ def parse_funder_page(html):
     return points, ref, name
 
 
-def fetch_tase(sec_id, attempts=4):
-    """Пробует /fund/<id> (קרנות נאמנות), потом /etf/<id> (קרנות סל / חוץ).
+def fetch_funder(sec_id, attempts=3):
+    """Funder: пробует /fund/<id> (קרנות נאמנות), потом /etf/<id> (קרנות סל / חוץ).
     Funder иногда отдаёт страницу с пустым графиком — поэтому повторяем."""
     last_err = "not found"
     for kind in ("fund", "etf"):
@@ -127,13 +136,9 @@ def fetch_tase(sec_id, attempts=4):
         for i in range(attempts):
             try:
                 final_url, html = http_get(url)
-            except (urllib.error.HTTPError, HTTPStatusError) as e:
-                code = getattr(e, "code", None)
-                if isinstance(e, urllib.error.HTTPError):
-                    last_err = f"{url}: HTTP {code}; server={e.headers.get('Server')}"
-                else:
-                    last_err = str(e)
-                if code in (401, 403, 429):
+            except HTTPStatusError as e:
+                last_err = str(e)
+                if e.code in (401, 403, 429):
                     raise RuntimeError(last_err)  # блокировка — повторять бессмысленно
                 time.sleep(2 + 2 * i)
                 continue
@@ -146,10 +151,89 @@ def fetch_tase(sec_id, attempts=4):
                 break  # такого типа нет — пробуем следующий
             points, ref, name = parse_funder_page(html)
             if len(points) >= 2:
-                return {"points": points, "ref": ref, "source_name": name, "url": url}
+                return {"points": points, "ref": ref, "source_name": name, "url": url, "source": "funder"}
             last_err = f"{url}: empty price graph (attempt {i + 1})"
             time.sleep(2 + 2 * i)
     raise RuntimeError(last_err)
+
+
+def _dmy(d):
+    """'24/09/2026' -> '2026-09-24'"""
+    dd, mm, yy = d.split("/")
+    return f"{yy}-{mm}-{dd}"
+
+
+def fetch_bizportal(sec_id):
+    """Bizportal: один JSON-запрос, ~5 лет дневных закрытий. Цены в агорот.
+    Работает и для קרנות נאמנות, и для קרנות סל / חוץ."""
+    url = ("https://www.bizportal.co.il/ajax/biz_papers_helper.ashx"
+           f"?action=get_paper_yearly_graph&request_type=1&paper_id={sec_id}")
+    _, text = http_get(url, headers={
+        "Referer": f"https://www.bizportal.co.il/mutualfunds/quote/generalview/{sec_id}",
+        "X-Requested-With": "XMLHttpRequest",
+    })
+    text = text.strip().lstrip("~")
+    rows = json.loads(text) if text.startswith("[") else []
+    points = []
+    for r in rows:
+        try:
+            price = float(r["C_p"]) / 100.0
+            if price > 0:
+                points.append({"date": _dmy(r["D_p"]), "price": round(price, 4)})
+        except (KeyError, TypeError, ValueError):
+            continue
+    if len(points) < 2:
+        raise RuntimeError(f"bizportal {sec_id}: no data (got {len(rows)} rows)")
+    return {"points": points, "ref": {}, "source": "bizportal",
+            "url": f"https://www.bizportal.co.il/mutualfunds/quote/generalview/{sec_id}"}
+
+
+def fetch_tase_api(sec_id, days=400):
+    """Официальный API биржи (тот же, что использует market.tase.co.il).
+    Отдаёт историю только для бумаг, которые торгуются на бирже (קרנות סל / חוץ, акции),
+    для קרנות נאמנות возвращает пусто. 30 строк на страницу."""
+    today = datetime.now(timezone.utc).date()
+    body = {"dFrom": (today - timedelta(days=days)).isoformat(), "dTo": today.isoformat(),
+            "oId": sec_id.zfill(8), "pType": 8, "TotalRec": 1, "lang": "0", "pageNum": 1}
+    hdrs = {"Referer": "https://market.tase.co.il/", "Origin": "https://market.tase.co.il",
+            "Accept": "application/json"}
+    points, page, total = [], 1, None
+    while page <= 20:
+        body["pageNum"] = page
+        _, text = http_get("https://api.tase.co.il/api/security/historyeod", headers=hdrs, json_body=body)
+        j = json.loads(text)
+        items = j.get("Items") or []
+        total = j.get("TotalRec") or 0
+        for it in items:
+            try:
+                price = float(it["CloseRate"]) / 100.0
+                if price > 0:
+                    points.append({"date": _dmy(it["TradeDate"]), "price": round(price, 4)})
+            except (KeyError, TypeError, ValueError):
+                continue
+        if not items or len(points) >= total:
+            break
+        page += 1
+        time.sleep(0.5)
+    if len(points) < 2:
+        raise RuntimeError(f"tase api {sec_id}: no data (TotalRec={total})")
+    return {"points": points, "ref": {}, "source": "tase",
+            "url": f"https://market.tase.co.il/he/market_data/security/{sec_id}/major_data"}
+
+
+def fetch_tase(sec_id):
+    """Пробует источники по очереди, пока один не сработает."""
+    errors = []
+    for name, fn in (("bizportal", fetch_bizportal), ("tase", fetch_tase_api), ("funder", fetch_funder)):
+        try:
+            res = fn(sec_id)
+            res.setdefault("source", name)
+            return res
+        except Exception as e:
+            msg = str(e)[:160]
+            print(f"   - {name}: {msg}")
+            errors.append(f"{name}: {msg}")
+    raise RuntimeError(" | ".join(errors))
 
 
 # ---------------------------------------------------------------- Yahoo (US)
@@ -172,7 +256,7 @@ def fetch_us(symbol, attempts=3):
                 d = datetime.fromtimestamp(ts + offset, tz=timezone.utc).strftime("%Y-%m-%d")
                 points.append({"date": d, "price": round(float(c), 4)})
             if len(points) >= 2:
-                return {"points": points, "ref": {},
+                return {"points": points, "ref": {}, "source": "yahoo",
                         "url": f"https://finance.yahoo.com/quote/{symbol}"}
             last_err = "no data"
         except Exception as e:
@@ -287,7 +371,7 @@ def main():
         except Exception as e:
             print(f"   ! fetch failed: {e}")
             failures.append(sid)
-            errors[sid] = str(e)[:400]
+            errors[sid] = str(e)[:600]
             if not old:
                 continue
             fetched = {"points": [], "ref": old.get("source_returns", {}),
@@ -314,6 +398,7 @@ def main():
 
         print(f"   price {last['price']} on {last['date']}, "
               f"1d {periods['1d']['pct']}, 1m {periods['1m']['pct']}, 1y {periods['1y']['pct']}"
+              + f" [{fetched.get('source', '?')}]"
               + ("" if fetch_ok else "  [STALE: kept previous data]"))
 
         result.append({
@@ -322,6 +407,7 @@ def main():
             "source": source,
             "currency": "USD" if source == "us" else "ILS",
             "source_url": fetched.get("url"),
+            "data_source": fetched.get("source") or (old or {}).get("data_source"),
             "fetch_ok": fetch_ok,
             "as_of": last["date"],
             "price": last["price"],
