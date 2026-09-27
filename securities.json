@@ -1,0 +1,11 @@
+[
+  {"id": "1159250", "name": "iShares Core S&P 500 UCITS", "source": "tase"},
+  {"id": "1146505", "name": "KSM ETF NASDAQ 100",         "source": "tase"},
+  {"id": "1183441", "name": "Invesco S&P 500 UCITS",      "source": "tase"},
+  {"id": "5122957", "name": "Kessem S&P 500 Hedged",      "source": "tase"},
+  {"id": "5133574", "name": "Harel Nasdaq 100 Hedged",    "source": "tase"},
+  {"id": "5140165", "name": "MTF MSCI World Hedged",      "source": "tase"},
+  {"id": "5117759", "name": "Ayalon S&P 500 x3",          "source": "tase"},
+  {"id": "5117684", "name": "Ayalon TA-125 x3",           "source": "tase"},
+  {"id": "MAGS",    "name": "Roundhill Magnificent 7 ETF", "source": "us"}
+]

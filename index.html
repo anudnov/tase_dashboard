@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TASE Securities Multi-Timeframe Monitor</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0d1117;
@@ -246,59 +246,17 @@
       margin-bottom: 12px;
     }
 
-    /* Модальное окно */
-    .modal-backdrop {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(4px);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
+    .amber { color: #d29922; font-weight: 600; }
+    .muted { color: var(--text-muted); }
+    .badge {
+      display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px;
+      border: 1px solid #d29922; color: #d29922; margin-left: 6px; vertical-align: middle;
     }
-
-    .modal {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      max-width: 420px;
-      width: 90%;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    }
-
-    .modal h2 {
-      font-size: 18px;
-      color: var(--text-bright);
-      margin-bottom: 16px;
-    }
-
-    .form-group {
-      margin-bottom: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .form-group label {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .form-group input, .form-group select {
-      width: 100%;
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-    }
+    .asset-id a { color: var(--accent); text-decoration: none; }
+    .asset-id a:hover { text-decoration: underline; }
+    .ref-line { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.6; }
+    .hint { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+    code { background: #21262d; padding: 1px 5px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -308,39 +266,41 @@
     <header>
       <div>
         <h1>TASE Multi-Security Tracker & Charts</h1>
-        <span style="font-size: 12px; color: var(--text-muted);">Tel Aviv Stock Exchange • Automated Market Monitor</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Real end-of-day prices • funder.co.il (TASE) + Yahoo Finance (US)</span>
       </div>
       <div class="controls">
-        <select id="fundSelect" onchange="onSelectChange()"></select>
-        <button class="btn-primary" onclick="openAddModal()">+ Add Security</button>
-        <button onclick="resetDefaults()">Reset to Server Default</button>
-        <button onclick="loadDataFromJSON()">Refresh Data</button>
+        <select id="fundSelect" onchange="selectSecurity(this.value)"></select>
+        <button onclick="resetHidden()">Show all</button>
+        <button onclick="loadData()">Refresh Data</button>
       </div>
     </header>
   </div>
 
   <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
       <h2 style="font-size: 16px; color: var(--text-bright);">Securities Performance Matrix</h2>
       <span style="font-size: 12px; color: var(--text-muted);">Click any row to display its charts</span>
     </div>
+    <div id="statusMessage" style="margin-top: 10px;">Loading data.json…</div>
     <div class="table-wrapper">
       <table>
         <thead>
           <tr>
-            <th>Security / Ticker</th>
-            <th>Latest Price</th>
+            <th>Security / ID</th>
+            <th>Last Close</th>
+            <th>As of</th>
             <th>1 Day</th>
             <th>1 Week</th>
             <th>1 Month</th>
             <th>6 Months</th>
             <th>1 Year</th>
-            <th style="text-align: center; width: 40px;">Act</th>
+            <th style="text-align: center; width: 40px;">Hide</th>
           </tr>
         </thead>
         <tbody id="comparisonTableBody"></tbody>
       </table>
     </div>
+    <div class="hint">To add or remove securities permanently, edit <code>securities.json</code> in the repository (TASE number or US ticker) and run the “Update TASE Portfolio Data” action. “Hide” only hides a row in this browser.</div>
   </div>
 
   <div class="card">
@@ -355,464 +315,272 @@
       </div>
     </div>
 
-    <div id="statusMessage">Connecting to data feed...</div>
+    <div id="refLine" class="ref-line"></div>
 
     <div class="charts-stack">
-      <!-- Row 1: 1 Day + 1 Week -->
       <div class="pair-row">
         <div class="chart-panel">
-          <div class="chart-header">
-            <h3>1 Day (1D) — Intraday Session</h3>
-            <span id="perf-1d" class="chart-perf">—</span>
-          </div>
-          <div class="canvas-wrapper-half"><canvas id="chart1D"></canvas></div>
+          <div class="chart-header"><h3>1 Week (1W)</h3><span id="perf-1w" class="chart-perf">—</span></div>
+          <div class="canvas-wrapper-half"><canvas id="chart-1w"></canvas></div>
         </div>
-
         <div class="chart-panel">
-          <div class="chart-header">
-            <h3>1 Week (1W)</h3>
-            <span id="perf-1w" class="chart-perf">—</span>
-          </div>
-          <div class="canvas-wrapper-half"><canvas id="chart1W"></canvas></div>
+          <div class="chart-header"><h3>1 Month (1M)</h3><span id="perf-1m" class="chart-perf">—</span></div>
+          <div class="canvas-wrapper-half"><canvas id="chart-1m"></canvas></div>
         </div>
       </div>
-
-      <!-- Row 2: 1 Month + 6 Months -->
       <div class="pair-row">
         <div class="chart-panel">
-          <div class="chart-header">
-            <h3>1 Month (1M)</h3>
-            <span id="perf-1m" class="chart-perf">—</span>
-          </div>
-          <div class="canvas-wrapper-half"><canvas id="chart1M"></canvas></div>
+          <div class="chart-header"><h3>6 Months (6M)</h3><span id="perf-6m" class="chart-perf">—</span></div>
+          <div class="canvas-wrapper-half"><canvas id="chart-6m"></canvas></div>
         </div>
-
         <div class="chart-panel">
-          <div class="chart-header">
-            <h3>6 Months (6M)</h3>
-            <span id="perf-6m" class="chart-perf">—</span>
-          </div>
-          <div class="canvas-wrapper-half"><canvas id="chart6M"></canvas></div>
+          <div class="chart-header"><h3>1 Year (1Y)</h3><span id="perf-1y" class="chart-perf">—</span></div>
+          <div class="canvas-wrapper-half"><canvas id="chart-1y"></canvas></div>
         </div>
       </div>
-
-      <!-- Row 3: 1 Year (1Y) Full Width -->
       <div class="chart-panel">
-        <div class="chart-header">
-          <h3>1 Year (1Y) — Complete Annual Trend</h3>
-          <span id="perf-1y" class="chart-perf">—</span>
-        </div>
-        <div class="canvas-wrapper-full"><canvas id="chart1Y"></canvas></div>
+        <div class="chart-header"><h3>All stored history</h3><span id="perf-max" class="chart-perf">—</span></div>
+        <div class="canvas-wrapper-full"><canvas id="chart-max"></canvas></div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Add New Security -->
-<div class="modal-backdrop" id="addModal">
-  <div class="modal">
-    <h2>Add New Security</h2>
-    <div class="form-group">
-      <label>Security ID / Ticker (e.g. 1174119 or SOXX)</label>
-      <input type="text" id="modalSecId" placeholder="1174119">
-    </div>
-    <div class="form-group">
-      <label>Fund Name / Description</label>
-      <input type="text" id="modalSecName" placeholder="KSM Indxx US Semiconductors">
-    </div>
-    <div class="form-group">
-      <label>Current Price (in ₪ or $)</label>
-      <input type="number" id="modalSecPrice" placeholder="125.50" step="0.01">
-    </div>
-    <div class="form-group">
-      <label>Currency</label>
-      <select id="modalSecCurrency">
-        <option value="ILS">Israeli Shekel (₪)</option>
-        <option value="USD">US Dollar ($)</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button onclick="closeAddModal()">Cancel</button>
-      <button class="btn-primary" onclick="submitNewSecurity()">Save Security</button>
     </div>
   </div>
 </div>
 
 <script>
-  const STORAGE_KEY = 'my_tase_portfolio_list';
+  const HIDDEN_KEY = 'tase_hidden_ids_v2';
+  const STALE_DAYS = 4;          // данные старше N дней подсвечиваются
+  const PERIOD_KEYS = ['1d', '1w', '1m', '6m', '1y'];
 
-  let securities = [];
-  let serverSecurities = [];
-  let selectedSecurityId = '';
-  let chartInstances = {};
+  let allSecurities = [];
+  let selectedId = '';
+  let charts = {};
 
-  function formatPrice(val, isUSD) {
-    if (val === undefined || val === null || isNaN(val)) return '—';
-    if (isUSD) {
-      return `$${Number(val).toFixed(2)}`;
-    }
-    return `${Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
+  // ---------- localStorage (только список скрытых строк) ----------
+  function getHidden() {
+    try { return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function setHidden(list) {
+    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  // старый ключ хранил вручную введённые цены — убираем его
+  try { localStorage.removeItem('my_tase_portfolio_list'); } catch (e) {}
+
+  function visible() {
+    const hidden = getHidden();
+    return allSecurities.filter(s => !hidden.includes(s.id));
   }
 
+  // ---------- форматирование ----------
+  function formatPrice(val, currency) {
+    if (val === undefined || val === null || isNaN(val)) return '—';
+    const digits = Math.abs(val) < 10 ? 4 : 2;
+    const num = Number(val).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    return currency === 'USD' ? `$${num}` : `${num} ₪`;
+  }
   function formatPct(val) {
     if (val === undefined || val === null || isNaN(val)) return '—';
     return `${val >= 0 ? '+' : ''}${Number(val).toFixed(2)}%`;
   }
-
-  function calcReturn(current, base) {
-    if (!base || base === 0) return 0;
-    return ((current - base) / base) * 100;
+  function pctClass(val) {
+    if (val === undefined || val === null || isNaN(val)) return 'muted';
+    return val >= 0 ? 'up' : 'down';
+  }
+  function daysSince(isoDate) {
+    const d = new Date(isoDate + 'T12:00:00Z');
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  }
+  function isStale(s) {
+    return !s.fetch_ok || daysSince(s.as_of) > STALE_DAYS;
+  }
+  function esc(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  function saveCustomListToStorage() {
-    const list = securities.map(s => ({
-      id: s.id,
-      name: s.name,
-      isUSD: s.isUSD,
-      price: s.price
-    }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  }
-
-  function getCustomListFromStorage() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+  // ---------- загрузка ----------
+  async function loadData() {
+    const status = document.getElementById('statusMessage');
+    status.textContent = 'Fetching data.json…';
+    status.style.color = 'var(--accent)';
     try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-    } catch (e) {
-      return null;
-    }
-  }
+      const res = await fetch('./data.json?v=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const root = await res.json();
+      if (root.schema_version !== 2) throw new Error('data.json is in the old format — run the GitHub Action once');
+      allSecurities = root.securities || [];
+      if (!allSecurities.length) throw new Error('data.json is empty — run the GitHub Action “Update TASE Portfolio Data” (Actions → Run workflow)');
 
-  async function loadDataFromJSON() {
-    const statusElem = document.getElementById('statusMessage');
-    statusElem.innerText = 'Fetching latest data from data.json...';
-    statusElem.style.color = 'var(--accent)';
-
-    try {
-      const res = await fetch('./data.json?v=' + new Date().getTime());
-      if (!res.ok) throw new Error('data.json not found (HTTP ' + res.status + ')');
-
-      const rootData = await res.json();
-      serverSecurities = rootData.securities || [];
-
-      if (!serverSecurities.length) throw new Error('data.json contains 0 securities');
-
-      const customList = getCustomListFromStorage();
-
-      if (customList) {
-        // Объединяем локальный список с актуальными котировками из файла
-        securities = customList.map(local => {
-          const fresh = serverSecurities.find(s => s.id === local.id);
-          return fresh ? fresh : synthesizeFallback(local);
-        });
-      } else {
-        securities = serverSecurities;
-      }
-
-      statusElem.innerText = `● Live data active (Updated: ${rootData.updated_at || 'Recently'})`;
-      statusElem.style.color = 'var(--green)';
-
+      const updated = root.updated_at || '?';
+      const ageH = (Date.now() - Date.parse(updated.replace(' UTC', 'Z').replace(' ', 'T'))) / 3600000;
+      const failures = (root.failures || []);
+      let msg = `● Data file generated: ${updated}`;
+      if (!isNaN(ageH)) msg += ` (${ageH < 48 ? Math.round(ageH) + ' h' : Math.round(ageH / 24) + ' days'} ago)`;
+      if (failures.length) msg += ` • failed to refresh: ${failures.join(', ')}`;
+      status.textContent = msg;
+      status.style.color = (failures.length || ageH > 72) ? '#d29922' : 'var(--green)';
     } catch (err) {
-      console.warn('Could not load data.json:', err);
-      statusElem.innerText = '● Warning: data.json not generated yet. Run GitHub Action "Update TASE Portfolio Data".';
-      statusElem.style.color = 'var(--red)';
-
-      const customList = getCustomListFromStorage();
-      if (customList) {
-        securities = customList.map(synthesizeFallback);
-      } else {
-        securities = [];
-      }
+      console.warn(err);
+      allSecurities = [];
+      status.textContent = '● Could not load data: ' + err.message;
+      status.style.color = 'var(--red)';
     }
-
-    if (!selectedSecurityId || !securities.find(s => s.id === selectedSecurityId)) {
-      selectedSecurityId = securities.length > 0 ? securities[0].id : '';
-    }
-
-    populateSelect();
-    updateDashboard();
+    const vis = visible();
+    if (!vis.find(s => s.id === selectedId)) selectedId = vis.length ? vis[0].id : '';
+    render();
   }
 
-  // Генерация временных точек, если тикер был добавлен вручную в браузере, а скрипт его еще не спарсил
-  function synthesizeFallback(s) {
-    if (s.daily && s.daily.length > 0) return s;
-    const p = s.price || 100;
-    const daily = [];
-    const now = new Date();
-    for (let i = 260; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - Math.floor(i * 1.4));
-      daily.append ? null : daily.push({
-        date: d.toISOString().split('T')[0],
-        price: p
-      });
-    }
-    const intraday = [
-      { time: '10:00', price: p },
-      { time: '17:15', price: p }
-    ];
-    return {
-      ...s,
-      p1d: s.p1d || 0,
-      p1w: s.p1w || 0,
-      p1m: s.p1m || 0,
-      p6m: s.p6m || 0,
-      p1y: s.p1y || 0,
-      daily,
-      intraday
-    };
+  // ---------- таблица ----------
+  function render() {
+    renderSelect();
+    renderTable();
+    renderDetails();
   }
 
-  function getMetrics(s) {
-    const d = s.daily || [];
-    const latest = d.length > 0 ? d[d.length - 1].price : s.price;
-    const prevWeek = d.length > 5 ? d[d.length - 6].price : latest;
-    const prevMonth = d.length > 22 ? d[d.length - 23].price : latest;
-    const prev6M = d.length > 130 ? d[d.length - 131].price : latest;
-    const prevYear = d.length > 0 ? d[0].price : latest;
-
-    return {
-      latest,
-      p1d: s.p1d !== undefined ? s.p1d : (d.length > 1 ? calcReturn(latest, d[d.length - 2].price) : 0),
-      p1w: s.p1w !== undefined ? s.p1w : calcReturn(latest, prevWeek),
-      p1m: s.p1m !== undefined ? s.p1m : calcReturn(latest, prevMonth),
-      p6m: s.p6m !== undefined ? s.p6m : calcReturn(latest, prev6M),
-      p1y: s.p1y !== undefined ? s.p1y : calcReturn(latest, prevYear)
-    };
+  function renderSelect() {
+    const sel = document.getElementById('fundSelect');
+    sel.innerHTML = '';
+    visible().forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = `${s.name} (${s.id})`;
+      o.selected = s.id === selectedId;
+      sel.appendChild(o);
+    });
   }
 
-  function renderComparisonTable() {
+  function renderTable() {
     const tbody = document.getElementById('comparisonTableBody');
     tbody.innerHTML = '';
-
-    if (!securities.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No securities found. Please run GitHub Action or click "+ Add Security".</td></tr>`;
+    const list = visible();
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:24px;">No data. Run the GitHub Action “Update TASE Portfolio Data”.</td></tr>`;
       return;
     }
-
-    securities.forEach(s => {
-      const m = getMetrics(s);
+    list.forEach(s => {
+      const p = s.periods || {};
+      const stale = isStale(s);
       const tr = document.createElement('tr');
-      tr.className = `clickable-row ${s.id === selectedSecurityId ? 'active-row' : ''}`;
+      tr.className = `clickable-row ${s.id === selectedId ? 'active-row' : ''}`;
       tr.onclick = () => selectSecurity(s.id);
-
+      const cells = PERIOD_KEYS.map(k => {
+        const v = p[k] ? p[k].pct : null;
+        return `<td class="${pctClass(v)}" title="${p[k] && p[k].from ? 'from ' + p[k].from : 'not enough history'}">${formatPct(v)}</td>`;
+      }).join('');
       tr.innerHTML = `
         <td>
-          <span class="asset-title">${s.name}</span>
-          <span class="asset-id">${s.id}</span>
+          <span class="asset-title">${esc(s.name)}</span>
+          <span class="asset-id">${s.source_url ? `<a href="${esc(s.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(s.id)}</a>` : esc(s.id)}</span>
         </td>
-        <td><strong>${formatPrice(m.latest, s.isUSD)}</strong></td>
-        <td class="${m.p1d >= 0 ? 'up' : 'down'}">${formatPct(m.p1d)}</td>
-        <td class="${m.p1w >= 0 ? 'up' : 'down'}">${formatPct(m.p1w)}</td>
-        <td class="${m.p1m >= 0 ? 'up' : 'down'}">${formatPct(m.p1m)}</td>
-        <td class="${m.p6m >= 0 ? 'up' : 'down'}">${formatPct(m.p6m)}</td>
-        <td class="${m.p1y >= 0 ? 'up' : 'down'}">${formatPct(m.p1y)}</td>
-        <td style="text-align: center;">
-          <button class="btn-danger" title="Delete security" onclick="deleteSecurity('${s.id}', event)">✕</button>
-        </td>
-      `;
+        <td><strong>${formatPrice(s.price, s.currency)}</strong></td>
+        <td class="${stale ? 'amber' : 'muted'}">${esc(s.as_of)}${stale ? '<span class="badge">stale</span>' : ''}</td>
+        ${cells}
+        <td style="text-align: center;"><button class="btn-danger" title="Hide in this browser" onclick="hideSecurity('${esc(s.id)}', event)">✕</button></td>`;
       tbody.appendChild(tr);
     });
   }
 
-  function populateSelect() {
-    const select = document.getElementById('fundSelect');
-    select.innerHTML = '';
-    securities.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.text = `${s.name} (${s.id})`;
-      if (s.id === selectedSecurityId) opt.selected = true;
-      select.appendChild(opt);
-    });
-  }
-
-  function onSelectChange() {
-    selectedSecurityId = document.getElementById('fundSelect').value;
-    updateDashboard();
-  }
-
   function selectSecurity(id) {
-    selectedSecurityId = id;
+    selectedId = id;
     document.getElementById('fundSelect').value = id;
-    updateDashboard();
+    renderTable();
+    renderDetails();
   }
 
-  function deleteSecurity(id, event) {
+  function hideSecurity(id, event) {
     event.stopPropagation();
-    if (securities.length <= 1) {
-      alert('You must keep at least one security in the list.');
-      return;
-    }
-    if (confirm(`Remove security ${id} from your list?`)) {
-      securities = securities.filter(s => s.id !== id);
-      saveCustomListToStorage();
-      if (selectedSecurityId === id) selectedSecurityId = securities[0].id;
-      populateSelect();
-      updateDashboard();
-    }
+    if (visible().length <= 1) return;
+    const hidden = getHidden();
+    if (!hidden.includes(id)) hidden.push(id);
+    setHidden(hidden);
+    if (selectedId === id) selectedId = visible()[0].id;
+    render();
   }
 
-  function resetDefaults() {
-    if (confirm('Reset portfolio back to default list from data.json?')) {
-      localStorage.removeItem(STORAGE_KEY);
-      loadDataFromJSON();
-    }
+  function resetHidden() {
+    setHidden([]);
+    render();
   }
 
-  function openAddModal() {
-    document.getElementById('modalSecId').value = '';
-    document.getElementById('modalSecName').value = '';
-    document.getElementById('modalSecPrice').value = '';
-    document.getElementById('addModal').style.display = 'flex';
-  }
-
-  function closeAddModal() {
-    document.getElementById('addModal').style.display = 'none';
-  }
-
-  function submitNewSecurity() {
-    const id = document.getElementById('modalSecId').value.trim();
-    const name = document.getElementById('modalSecName').value.trim();
-    const rawPrice = parseFloat(document.getElementById('modalSecPrice').value);
-    const isUSD = document.getElementById('modalSecCurrency').value === 'USD';
-
-    if (!id || !name || isNaN(rawPrice) || rawPrice <= 0) {
-      alert('Please fill out all fields with valid numbers.');
-      return;
-    }
-
-    if (securities.some(s => s.id.toLowerCase() === id.toLowerCase())) {
-      alert('A security with this ID already exists.');
-      return;
-    }
-
-    const newSec = synthesizeFallback({
-      id: id,
-      name: name,
-      price: rawPrice,
-      isUSD: isUSD,
-      p1d: 0.0,
-      p1w: 0.0,
-      p1m: 0.0,
-      p6m: 0.0,
-      p1y: 0.0
-    });
-
-    securities.push(newSec);
-    saveCustomListToStorage();
-    selectedSecurityId = id;
-    closeAddModal();
-    populateSelect();
-    updateDashboard();
-  }
-
-  function updateDashboard() {
-    renderComparisonTable();
-    renderCharts();
-  }
-
-  function renderCharts() {
-    const s = securities.find(item => item.id === selectedSecurityId);
+  // ---------- графики ----------
+  function renderDetails() {
+    const s = allSecurities.find(x => x.id === selectedId);
     if (!s) return;
+    const p = s.periods || {};
 
-    const m = getMetrics(s);
-    document.getElementById('activeFundTitle').innerText = s.name;
-    document.getElementById('activeFundSymbol').innerText = s.id + (s.isUSD ? ' (USD)' : ' (TASE / ILS)');
-    document.getElementById('activeCurrentPrice').innerText = formatPrice(m.latest, s.isUSD);
-    
-    const changeElem = document.getElementById('activePriceChange');
-    changeElem.innerText = `${m.p1d >= 0 ? '▲ ' : '▼ '}${formatPct(m.p1d)} (1D)`;
-    changeElem.className = m.p1d >= 0 ? 'up' : 'down';
+    document.getElementById('activeFundTitle').textContent = s.name;
+    document.getElementById('activeFundSymbol').textContent =
+      `${s.id} • ${s.currency === 'USD' ? 'USD (Yahoo Finance)' : 'TASE / ILS (funder.co.il)'} • last close ${s.as_of}`;
+    document.getElementById('activeCurrentPrice').textContent = formatPrice(s.price, s.currency);
+    const ch = document.getElementById('activePriceChange');
+    const d1 = p['1d'] ? p['1d'].pct : null;
+    ch.textContent = d1 === null ? '' : `${d1 >= 0 ? '▲ ' : '▼ '}${formatPct(d1)} (1D vs ${p['1d'].from})`;
+    ch.className = pctClass(d1);
 
-    // 1. Chart 1D: Intraday
-    const intra = s.intraday || [];
-    if (intra.length > 0) {
-      drawChart('chart1D', 'perf-1d', intra.map(x => x.time), intra.map(x => x.price), m.p1d, s.isUSD);
-    }
+    // Строка сверки с цифрами самого Funder
+    const ref = s.source_returns || {};
+    const refParts = PERIOD_KEYS.filter(k => typeof ref[k] === 'number')
+      .map(k => `${k.toUpperCase()} ${formatPct(ref[k])}`);
+    let refHtml = '';
+    if (refParts.length) refHtml += `Funder's own figures (for cross-check): ${refParts.join(' • ')}`;
+    if (s.split_notes && s.split_notes.length) refHtml += `${refHtml ? '<br>' : ''}Adjusted: ${s.split_notes.map(esc).join('; ')}`;
+    if (isStale(s)) refHtml += `${refHtml ? '<br>' : ''}<span class="amber">⚠ Latest price is from ${esc(s.as_of)}${s.fetch_ok ? '' : ' — last refresh failed, showing previously saved data'}.</span>`;
+    document.getElementById('refLine').innerHTML = refHtml;
 
-    // 2. Chart 1W: 5 дней
-    const d = s.daily || [];
-    const wData = d.slice(-6);
-    drawChart('chart1W', 'perf-1w', wData.map(x => x.date.slice(5)), wData.map(x => x.price), m.p1w, s.isUSD);
-
-    // 3. Chart 1M: 22 торговых дня
-    const mData = d.slice(-23);
-    drawChart('chart1M', 'perf-1m', mData.map(x => x.date.slice(5)), mData.map(x => x.price), m.p1m, s.isUSD);
-
-    // 4. Chart 6M: 130 торговых дней
-    const m6Data = d.slice(-131);
-    drawChart('chart6M', 'perf-6m', m6Data.map(x => x.date.slice(5)), m6Data.map(x => x.price), m.p6m, s.isUSD);
-
-    // 5. Chart 1Y: вся годовая история
-    drawChart('chart1Y', 'perf-1y', d.map(x => x.date.slice(2)), d.map(x => x.price), m.p1y, s.isUSD);
+    const daily = s.daily || [];
+    ['1w', '1m', '6m', '1y'].forEach(k => {
+      const from = p[k] && p[k].from;
+      const slice = from ? daily.filter(x => x.date >= from) : [];
+      drawChart(k, slice, p[k] ? p[k].pct : null, s.currency);
+    });
+    const maxPct = daily.length > 1 ? (daily[daily.length - 1].price / daily[0].price - 1) * 100 : null;
+    drawChart('max', daily, maxPct, s.currency);
   }
 
-  function drawChart(canvasId, perfId, labels, data, pctVal, isUSD) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    const perfElem = document.getElementById(perfId);
-    
-    perfElem.innerText = formatPct(pctVal);
-    perfElem.className = `chart-perf ${pctVal >= 0 ? 'up' : 'down'}`;
+  function drawChart(key, points, pctVal, currency) {
+    const perf = document.getElementById('perf-' + key);
+    perf.textContent = pctVal === null ? 'not enough history' : formatPct(pctVal);
+    perf.className = 'chart-perf ' + pctClass(pctVal);
 
-    const isGrowing = pctVal >= 0;
-    const color = isGrowing ? '#3fb950' : '#f85149';
+    if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+    if (points.length < 2) return;
 
-    if (chartInstances[canvasId]) {
-      chartInstances[canvasId].destroy();
-    }
-
-    // Если данные пусты или из 1 точки, выравниваем график
-    const safeData = data.length > 0 ? data : [0, 0];
-    const safeLabels = labels.length > 0 ? labels : ['Start', 'End'];
-
-    chartInstances[canvasId] = new Chart(ctx, {
+    const up = pctVal === null || pctVal >= 0;
+    const color = up ? '#3fb950' : '#f85149';
+    const ctx = document.getElementById('chart-' + key).getContext('2d');
+    charts[key] = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: safeLabels,
+        labels: points.map(x => key === 'max' || key === '1y' ? x.date.slice(2) : x.date.slice(5)),
         datasets: [{
-          data: safeData,
+          data: points.map(x => x.price),
           borderColor: color,
-          backgroundColor: isGrowing ? 'rgba(63, 185, 80, 0.05)' : 'rgba(248, 81, 73, 0.05)',
+          backgroundColor: up ? 'rgba(63, 185, 80, 0.06)' : 'rgba(248, 81, 73, 0.06)',
           borderWidth: 2,
-          pointRadius: 0,
+          pointRadius: points.length <= 10 ? 3 : 0,
           pointHoverRadius: 4,
-          tension: 0.15,
+          tension: 0.1,
           fill: true
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         scales: {
-          x: {
-            ticks: { color: '#8b949e', maxTicksLimit: canvasId === 'chart1Y' ? 12 : 6, font: { size: 10 } },
-            grid: { color: '#21262d' }
-          },
-          y: {
-            ticks: {
-              color: '#8b949e',
-              font: { size: 10 },
-              callback: val => isUSD ? `$${val}` : `${val} ₪`
-            },
-            grid: { color: '#30363d' }
-          }
+          x: { ticks: { color: '#8b949e', maxTicksLimit: key === 'max' ? 12 : 6, font: { size: 10 } }, grid: { color: '#21262d' } },
+          y: { ticks: { color: '#8b949e', font: { size: 10 }, callback: v => { const n = Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 }); return currency === 'USD' ? `$${n}` : `${n} ₪`; } }, grid: { color: '#30363d' } }
         },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ` ${formatPrice(ctx.parsed.y, isUSD)}`
-            }
-          }
+          tooltip: { callbacks: {
+            title: items => points[items[0].dataIndex].date,
+            label: c => ' ' + formatPrice(c.parsed.y, currency)
+          } }
         }
       }
     });
   }
 
-  window.onload = loadDataFromJSON;
+  window.addEventListener('load', loadData);
 </script>
 </body>
 </html>
