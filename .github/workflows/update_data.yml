@@ -29,7 +29,7 @@ jobs:
           python-version: '3.12'
 
       - name: Run updater script
-        run: python updater.py
+        run: python -u updater.py
 
       - name: Commit and push changes
         run: |
