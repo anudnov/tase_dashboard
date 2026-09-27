@@ -2,9 +2,9 @@ name: Update TASE Portfolio Data
 
 on:
   schedule:
-    # Запуск с воскресенья по четверг (торговые дни TASE) в 16:30 UTC (~19:30 по Израилю)
+    # Запуск с воскресенья по четверг (дни торгов TASE) в 16:30 UTC
     - cron: '30 16 * * 0-4'
-  workflow_dispatch: # Позволяет запускать вручную по кнопке Run workflow в GitHub
+  workflow_dispatch:
 
 permissions:
   contents: write
