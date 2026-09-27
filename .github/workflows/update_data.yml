@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install HTTP client
+        run: pip install curl_cffi
+
       - name: Run updater script
         run: python -u updater.py
 
