@@ -2,11 +2,19 @@ name: Update TASE Portfolio Data
 
 on:
   schedule:
-    - cron: '30 16 * * 0-4'
+    # Время в UTC. Израиль = UTC+3 летом / UTC+2 зимой.
+    # 18:40 UTC (~21:40 IL): закрытие TASE + вечерние цены קרנות נאמנות. Вс–Пт.
+    - cron: '40 18 * * 0-5'
+    # 04:10 UTC (~07:10 IL): добираем поздние цены фондов и закрытие биржи США. Пн–Сб.
+    - cron: '10 4 * * 1-6'
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -18,7 +26,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Run updater script
         run: python updater.py
@@ -28,4 +36,12 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-update market data [skip ci]" && git push)
+          if git diff --staged --quiet; then
+            echo "No changes in data.json"
+            exit 0
+          fi
+          # Без [skip ci]: этот маркер может заблокировать пересборку GitHub Pages,
+          # и сайт продолжит показывать старый data.json.
+          git commit -m "chore: auto-update market data"
+          git pull --rebase
+          git push
