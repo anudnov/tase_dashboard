@@ -3,7 +3,7 @@ TASE dashboard updater.
 
 Берёт РЕАЛЬНЫЕ исторические цены закрытия:
   * израильские бумаги (קרנות נאמנות / קרנות סל / קרנות חוץ) — по очереди из
-    Bizportal (JSON-график), официального API TASE (только торгуемые бумаги) и Funder;
+    официального API TASE (קרנות סל / חוץ), Maya/TASE (קרנות נאמנות), Bizportal и Funder;
   * американские тикеры — с Yahoo Finance.
 
 Ничего не "досчитывает" и не рисует синтетику: если данных нет — поле будет null,
@@ -221,10 +221,40 @@ def fetch_tase_api(sec_id, days=400):
             "url": f"https://market.tase.co.il/he/market_data/security/{sec_id}/major_data"}
 
 
+def fetch_maya_fund(sec_id, days=420):
+    """Maya (TASE) — цены קרנות נאמנות. POST, максимум 30 строк на страницу. Цены в агорот."""
+    url = f"https://maya.tase.co.il/api/v1/funds/mutual/{sec_id}/history"
+    hdrs = {"Referer": f"https://maya.tase.co.il/he/funds/mutual-funds/{sec_id}",
+            "Origin": "https://maya.tase.co.il", "Accept": "application/json"}
+    stop = (datetime.now(timezone.utc).date() - timedelta(days=days)).isoformat()
+    points = []
+    for page in range(1, 21):
+        # period=3 — длинный период; лишние поля в теле запроса сервер отвергает (403)
+        _, text = http_get(url, headers=hdrs, json_body={"period": 3, "pageNumber": page, "pageSize": 30})
+        rows = json.loads(text)
+        if not isinstance(rows, list) or not rows:
+            break
+        for r in rows:
+            try:
+                price = float(r.get("purchasePrice") or r.get("sellPrice")) / 100.0
+                if price > 0:
+                    points.append({"date": str(r["tradeDate"])[:10], "price": round(price, 4)})
+            except (KeyError, TypeError, ValueError):
+                continue
+        if points and points[-1]["date"] < stop:
+            break
+        time.sleep(0.4)
+    if len(points) < 2:
+        raise RuntimeError(f"maya {sec_id}: no data")
+    return {"points": points, "ref": {}, "source": "maya",
+            "url": f"https://maya.tase.co.il/he/funds/mutual-funds/{sec_id}"}
+
+
 def fetch_tase(sec_id):
     """Пробует источники по очереди, пока один не сработает."""
     errors = []
-    for name, fn in (("bizportal", fetch_bizportal), ("tase", fetch_tase_api), ("funder", fetch_funder)):
+    for name, fn in (("tase", fetch_tase_api), ("maya", fetch_maya_fund),
+                     ("bizportal", fetch_bizportal), ("funder", fetch_funder)):
         try:
             res = fn(sec_id)
             res.setdefault("source", name)
