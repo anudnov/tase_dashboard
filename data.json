@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "updated_at": "2026-11-12 23:52:21 UTC",
+ "updated_at": "2026-11-13 12:08:08 UTC",
  "failures": [],
  "errors": {},
  "securities": [
@@ -2465,7 +2465,7 @@
    "source_returns": {},
    "split_notes": [
     "2025-12-15: split/units ×100 adjusted",
-    "2025-10-08: split/units ×0.01 adjusted"
+    "2025-10-09: split/units ×0.01 adjusted"
    ],
    "daily": [
     {
@@ -5864,28 +5864,28 @@
    "source_url": "https://maya.tase.co.il/he/funds/mutual-funds/5140165",
    "data_source": "maya",
    "fetch_ok": true,
-   "as_of": "2026-11-10",
-   "price": 1.3763,
+   "as_of": "2026-11-11",
+   "price": 1.3722,
    "periods": {
     "1d": {
-     "pct": 1.05,
-     "from": "2026-11-09"
+     "pct": -0.3,
+     "from": "2026-11-10"
     },
     "1w": {
-     "pct": -0.78,
-     "from": "2026-11-03"
+     "pct": 2.3,
+     "from": "2026-11-04"
     },
     "1m": {
-     "pct": -1.6,
-     "from": "2026-10-08"
+     "pct": -1.94,
+     "from": "2026-10-12"
     },
     "6m": {
-     "pct": 1.94,
-     "from": "2026-05-12"
+     "pct": 1.02,
+     "from": "2026-05-13"
     },
     "1y": {
-     "pct": 10.42,
-     "from": "2025-11-10"
+     "pct": 9.81,
+     "from": "2025-11-11"
     }
    },
    "source_returns": {},
@@ -6834,6 +6834,10 @@
     {
      "date": "2026-11-10",
      "price": 1.3763
+    },
+    {
+     "date": "2026-11-11",
+     "price": 1.3722
     }
    ]
   },
