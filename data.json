@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "updated_at": "2026-11-13 12:08:08 UTC",
+ "updated_at": "2026-11-13 23:51:59 UTC",
  "failures": [],
  "errors": {},
  "securities": [
@@ -12,28 +12,28 @@
    "source_url": "https://market.tase.co.il/he/market_data/security/1159250/major_data",
    "data_source": "tase",
    "fetch_ok": true,
-   "as_of": "2026-11-12",
-   "price": 2620.0,
+   "as_of": "2026-11-13",
+   "price": 2635.0,
    "periods": {
     "1d": {
-     "pct": 0.61,
-     "from": "2026-11-11"
+     "pct": 0.57,
+     "from": "2026-11-12"
     },
     "1w": {
-     "pct": 1.2,
-     "from": "2026-11-05"
+     "pct": 3.41,
+     "from": "2026-11-06"
     },
     "1m": {
-     "pct": 1.31,
-     "from": "2026-10-13"
+     "pct": 1.62,
+     "from": "2026-10-14"
     },
     "6m": {
-     "pct": 12.25,
-     "from": "2026-05-14"
+     "pct": 13.02,
+     "from": "2026-05-15"
     },
     "1y": {
-     "pct": 11.55,
-     "from": "2025-11-12"
+     "pct": 12.54,
+     "from": "2025-11-13"
     }
    },
    "source_returns": {},
@@ -1214,6 +1214,10 @@
     {
      "date": "2026-11-12",
      "price": 2620.0
+    },
+    {
+     "date": "2026-11-13",
+     "price": 2635.0
     }
    ]
   },
@@ -1225,28 +1229,28 @@
    "source_url": "https://market.tase.co.il/he/market_data/security/1146505/major_data",
    "data_source": "tase",
    "fetch_ok": true,
-   "as_of": "2026-11-12",
-   "price": 862.1,
+   "as_of": "2026-11-13",
+   "price": 869.4,
    "periods": {
     "1d": {
-     "pct": 0.35,
-     "from": "2026-11-11"
+     "pct": 0.85,
+     "from": "2026-11-12"
     },
     "1w": {
-     "pct": 0.96,
-     "from": "2026-11-05"
+     "pct": 4.95,
+     "from": "2026-11-06"
     },
     "1m": {
-     "pct": -4.04,
-     "from": "2026-10-13"
+     "pct": -2.97,
+     "from": "2026-10-14"
     },
     "6m": {
-     "pct": 4.89,
-     "from": "2026-05-14"
+     "pct": 6.62,
+     "from": "2026-05-15"
     },
     "1y": {
-     "pct": 10.07,
-     "from": "2025-11-12"
+     "pct": 11.62,
+     "from": "2025-11-13"
     }
    },
    "source_returns": {},
@@ -2427,6 +2431,10 @@
     {
      "date": "2026-11-12",
      "price": 862.1
+    },
+    {
+     "date": "2026-11-13",
+     "price": 869.4
     }
    ]
   },
@@ -2438,28 +2446,28 @@
    "source_url": "https://market.tase.co.il/he/market_data/security/1183441/major_data",
    "data_source": "tase",
    "fetch_ok": true,
-   "as_of": "2026-11-12",
-   "price": 48.88,
+   "as_of": "2026-11-13",
+   "price": 49.1,
    "periods": {
     "1d": {
-     "pct": -1.47,
-     "from": "2026-11-11"
+     "pct": 0.45,
+     "from": "2026-11-12"
     },
     "1w": {
-     "pct": 1.2,
-     "from": "2026-11-05"
+     "pct": 3.3,
+     "from": "2026-11-06"
     },
     "1m": {
-     "pct": 1.47,
-     "from": "2026-10-13"
+     "pct": 1.64,
+     "from": "2026-10-14"
     },
     "6m": {
-     "pct": 12.42,
-     "from": "2026-05-14"
+     "pct": 13.11,
+     "from": "2026-05-15"
     },
     "1y": {
-     "pct": 11.85,
-     "from": "2025-11-12"
+     "pct": 12.69,
+     "from": "2025-11-13"
     }
    },
    "source_returns": {},
@@ -3643,6 +3651,10 @@
     {
      "date": "2026-11-12",
      "price": 48.88
+    },
+    {
+     "date": "2026-11-13",
+     "price": 49.1
     }
    ]
   },
@@ -9311,28 +9323,28 @@
    "source_url": "https://finance.yahoo.com/quote/MAGS",
    "data_source": "yahoo",
    "fetch_ok": true,
-   "as_of": "2026-11-12",
-   "price": 68.86,
+   "as_of": "2026-11-13",
+   "price": 68.66,
    "periods": {
     "1d": {
-     "pct": -0.04,
-     "from": "2026-11-11"
+     "pct": -0.29,
+     "from": "2026-11-12"
     },
     "1w": {
-     "pct": 3.01,
-     "from": "2026-11-05"
+     "pct": 1.67,
+     "from": "2026-11-06"
     },
     "1m": {
-     "pct": -7.32,
-     "from": "2026-10-13"
+     "pct": -5.78,
+     "from": "2026-10-14"
     },
     "6m": {
-     "pct": -2.93,
-     "from": "2026-05-14"
+     "pct": -1.69,
+     "from": "2026-05-15"
     },
     "1y": {
-     "pct": 3.55,
-     "from": "2025-11-12"
+     "pct": 5.96,
+     "from": "2025-11-13"
     }
    },
    "source_returns": {},
@@ -11477,6 +11489,10 @@
     {
      "date": "2026-11-12",
      "price": 68.86
+    },
+    {
+     "date": "2026-11-13",
+     "price": 68.66
     }
    ]
   }
