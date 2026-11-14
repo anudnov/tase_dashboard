@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "updated_at": "2026-11-13 23:51:59 UTC",
+ "updated_at": "2026-11-14 11:25:40 UTC",
  "failures": [],
  "errors": {},
  "securities": [
@@ -2473,7 +2473,7 @@
    "source_returns": {},
    "split_notes": [
     "2025-12-15: split/units ×100 adjusted",
-    "2025-10-09: split/units ×0.01 adjusted"
+    "2025-10-12: split/units ×0.01 adjusted"
    ],
    "daily": [
     {
