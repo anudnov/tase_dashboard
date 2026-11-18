@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "updated_at": "2026-11-18 01:17:47 UTC",
+ "updated_at": "2026-11-18 12:58:41 UTC",
  "failures": [],
  "errors": {},
  "securities": [
@@ -9387,28 +9387,28 @@
    "source_url": "https://finance.yahoo.com/quote/MAGS",
    "data_source": "yahoo",
    "fetch_ok": true,
-   "as_of": "2026-11-16",
-   "price": 66.94,
+   "as_of": "2026-11-17",
+   "price": 66.42,
    "periods": {
     "1d": {
-     "pct": -2.51,
-     "from": "2026-11-13"
+     "pct": -0.78,
+     "from": "2026-11-16"
     },
     "1w": {
      "pct": -3.11,
-     "from": "2026-11-09"
+     "from": "2026-11-10"
     },
     "1m": {
-     "pct": -6.09,
+     "pct": -6.82,
      "from": "2026-10-16"
     },
     "6m": {
-     "pct": -3.63,
-     "from": "2026-05-18"
+     "pct": -3.08,
+     "from": "2026-05-19"
     },
     "1y": {
-     "pct": 3.16,
-     "from": "2025-11-14"
+     "pct": 2.58,
+     "from": "2025-11-17"
     }
    },
    "source_returns": {},
@@ -11561,6 +11561,10 @@
     {
      "date": "2026-11-16",
      "price": 66.94
+    },
+    {
+     "date": "2026-11-17",
+     "price": 66.42
     }
    ]
   }
