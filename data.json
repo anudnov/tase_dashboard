@@ -1,6 +1,6 @@
 {
  "schema_version": 2,
- "updated_at": "2026-11-20 12:49:43 UTC",
+ "updated_at": "2026-11-21 00:13:14 UTC",
  "failures": [],
  "errors": {},
  "securities": [
@@ -2513,7 +2513,7 @@
    "source_returns": {},
    "split_notes": [
     "2025-12-15: split/units ×100 adjusted",
-    "2025-10-16: split/units ×0.01 adjusted"
+    "2025-10-19: split/units ×0.01 adjusted"
    ],
    "daily": [
     {
@@ -9467,28 +9467,28 @@
    "source_url": "https://finance.yahoo.com/quote/MAGS",
    "data_source": "yahoo",
    "fetch_ok": true,
-   "as_of": "2026-11-19",
-   "price": 65.03,
+   "as_of": "2026-11-20",
+   "price": 61.66,
    "periods": {
     "1d": {
-     "pct": -2.69,
-     "from": "2026-11-18"
+     "pct": -5.18,
+     "from": "2026-11-19"
     },
     "1w": {
-     "pct": -5.56,
-     "from": "2026-11-12"
+     "pct": -10.2,
+     "from": "2026-11-13"
     },
     "1m": {
-     "pct": -9.93,
-     "from": "2026-10-20"
+     "pct": -15.41,
+     "from": "2026-10-21"
     },
     "6m": {
-     "pct": -6.43,
-     "from": "2026-05-21"
+     "pct": -11.1,
+     "from": "2026-05-22"
     },
     "1y": {
-     "pct": 1.51,
-     "from": "2025-11-19"
+     "pct": -2.03,
+     "from": "2025-11-20"
     }
    },
    "source_returns": {},
@@ -11653,6 +11653,10 @@
     {
      "date": "2026-11-19",
      "price": 65.03
+    },
+    {
+     "date": "2026-11-20",
+     "price": 61.66
     }
    ]
   }
